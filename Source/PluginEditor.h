@@ -103,42 +103,58 @@ private:
         std::unique_ptr<APVTS::SliderAttachment> attachment;   // détruit en premier
     };
 
-    Knob* makeKnob (const juce::String& paramId, const juce::String& name, juce::Colour colour, bool linear = false);
+    struct PageItem { juce::Component* comp; int page; };
+    struct Panel    { int page; juce::Rectangle<int> area; juce::String title; juce::Colour colour; };
+
+    static constexpr int pageOsc = 0, pageFilter = 1, pageFx = 2, pageSeq = 3;
+
+    Knob* makeKnob (int page, const juce::String& paramId, const juce::String& name, juce::Colour colour,
+                    bool linear = false);
+    void setupCombo (int page, juce::ComboBox&, juce::Label&, const juce::String& title, juce::Colour colour,
+                     const juce::StringArray& items);
+    void updatePageVisibility();
+
     static void placeKnob (Knob* k, juce::Rectangle<int> bounds);
     static void layoutRow (const std::vector<Knob*>& items, juce::Rectangle<int> content);
     static void placeCombo (juce::Label& label, juce::ComboBox& box, juce::Rectangle<int> bounds);
 
-    void setupCombo (juce::ComboBox&, juce::Label&, const juce::String& title, juce::Colour colour,
-                     const juce::StringArray& items);
     void refreshPresetList (const juce::String& select = {});
     void stepPreset (int delta);
 
-    void drawPanel (juce::Graphics&, juce::Rectangle<int> area, const juce::String& title, juce::Colour colour);
+    void drawPanel (juce::Graphics&, const Panel&);
     void drawScope (juce::Graphics&, juce::Rectangle<float> area);
     void timerCallback() override;
 
     MonSyntheProcessor& proc;
     CyberLookAndFeel laf;
 
+    int page = 0;
+    std::vector<PageItem> pageItems;
+    std::vector<Panel> panels;
+
     // Boutons rotatifs / curseurs
     std::vector<std::unique_ptr<Knob>> knobs;
     Knob* waveKnob = nullptr;
     Knob* gateKnob = nullptr;
     Knob* tempoKnob = nullptr;
-    std::vector<Knob*> unisonKnobs, filterKnobs, lfoKnobs, modKnobs, ampKnobs;
+    std::vector<Knob*> oscBKnobs, unisonKnobs, lfoKnobs, modKnobs,
+                       filterKnobs, fltEnvKnobs, ampKnobs, jeuKnobs,
+                       chorusKnobs, delayKnobs, reverbKnobs;
 
-    // LFO
-    juce::ComboBox lfoShapeBox;
-    juce::Label lfoShapeLabel;
-    std::unique_ptr<APVTS::ComboBoxAttachment> lfoShapeAttachment;
+    // Listes déroulantes
+    juce::ComboBox lfoShapeBox, filterTypeBox, barsBox, rateBox;
+    juce::Label lfoShapeLabel, filterTypeLabel, barsLabel, rateLabel;
+    std::unique_ptr<APVTS::ComboBoxAttachment> lfoShapeAttachment, filterTypeAttachment,
+                                               barsAttachment, rateAttachment;
 
-    // Séquenceur
-    juce::TextButton seqButton;
-    juce::ComboBox barsBox, rateBox;
-    juce::Label barsLabel, rateLabel;
-    std::unique_ptr<APVTS::ButtonAttachment> seqButtonAttachment;
-    std::unique_ptr<APVTS::ComboBoxAttachment> barsAttachment, rateAttachment;
+    // Boutons on/off
+    juce::TextButton monoButton, seqButton;
+    std::unique_ptr<APVTS::ButtonAttachment> monoAttachment, seqButtonAttachment;
+
     StepGrid grid;
+
+    // Onglets
+    std::array<juce::TextButton, 4> tabButtons;
 
     // Presets
     juce::ComboBox presetBox;
@@ -146,7 +162,7 @@ private:
     juce::TextEditor nameEditor;
     int deleteArmed = 0;
 
-    juce::Rectangle<int> waveArea, unisonArea, filterArea, lfoArea, modArea, ampArea, seqArea, scopeArea;
+    juce::Rectangle<int> scopeArea;
     float lastPos = -1.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MonSyntheEditor)

@@ -17,7 +17,7 @@ public:
 
     static int levelForFrequency (double hz) noexcept;
 
-    // position : 0..1 (balaye les 8 formes d'onde), phase : 0..1
+    // position : 0..1 (balaie les 8 formes d'onde), phase : 0..1
     float getSample (float position, int level, double phase) const noexcept;
 
 private:
@@ -62,6 +62,8 @@ public:
 class SynthVoice : public juce::SynthesiserVoice
 {
 public:
+    static constexpr int maxUnison = 7;
+
     SynthVoice (juce::AudioProcessorValueTreeState& state, const WavetableBank& wavetables)
         : apvts (state), bank (wavetables) {}
 
@@ -72,29 +74,54 @@ public:
         return dynamic_cast<SynthSound*> (s) != nullptr;
     }
 
-    void startNote (int midiNote, float velocity, juce::SynthesiserSound*, int) override;
+    void startNote (int midiNote, float velocity, juce::SynthesiserSound*, int pitchWheelPosition) override;
     void stopNote (float velocity, bool allowTailOff) override;
-    void pitchWheelMoved (int) override {}
+    void pitchWheelMoved (int newValue) override;
     void controllerMoved (int, int) override {}
     void renderNextBlock (juce::AudioBuffer<float>&, int startSample, int numSamples) override;
 
+    // Mode mono / legato : change la note sans redéclencher les enveloppes
+    void legatoTo (int midiNote, float velocity);
+    bool isKeyDown() const noexcept { return keyDown; }
+
 private:
+    float param (const char* id) const { return apvts.getRawParameterValue (id)->load(); }
+
     juce::AudioProcessorValueTreeState& apvts;
     const WavetableBank& bank;
 
-    juce::ADSR adsr;      // enveloppe de volume
-    juce::ADSR modEnv;    // enveloppe de modulation (wavetable)
-    juce::dsp::StateVariableTPTFilter<float> filter;
+    juce::ADSR adsr;      // volume
+    juce::ADSR modEnv;    // position de la wavetable
+    juce::ADSR fltEnv;    // fréquence de coupure du filtre
+    juce::dsp::StateVariableTPTFilter<float> filter, filter2;   // filter2 : 2e étage pour le LP 24 dB
     juce::SmoothedValue<float> position;
 
     double sr = 44100.0;
-    static constexpr int maxUnison = 7;
-    std::array<double, maxUnison> phases {};   // une phase par oscillateur d'unison
-    juce::Random rng;
-    double phaseInc = 0.0;
+    std::array<double, maxUnison> phasesA {}, phasesB {};
+    double phaseSub = 0.0;
     double lfoPhase = 0.0;
-    int level = 0;
+    juce::Random rng;
+
+    double currentNote = 60.0;     // note actuelle (peut glisser vers targetNote)
+    double targetNote = 60.0;
+    float bendNorm = 0.0f;         // pitch bend, de -1 à +1
     float gain = 0.0f;
+    bool keyDown = false;
+};
+
+//==============================================================================
+// Synthé qui peut fonctionner en polyphonie ou en mono (une seule voix, legato)
+class MonoCapableSynth : public juce::Synthesiser
+{
+public:
+    void setMono (bool shouldBeMono);
+
+    void noteOn (int midiChannel, int midiNoteNumber, float velocity) override;
+    void noteOff (int midiChannel, int midiNoteNumber, float velocity, bool allowTailOff) override;
+
+private:
+    bool mono = false;
+    juce::Array<int> held;       // notes tenues, dans l'ordre d'appui
 };
 
 //==============================================================================
@@ -115,7 +142,7 @@ public:
     bool acceptsMidi() const override  { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
-    double getTailLengthSeconds() const override { return 0.0; }
+    double getTailLengthSeconds() const override { return 2.0; }
 
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
@@ -147,14 +174,24 @@ private:
     juce::ValueTree makeState();
     void applyState (const juce::ValueTree&);
     void generateSequencerMidi (juce::MidiBuffer&, int numSamples);
+    void applyEffects (juce::AudioBuffer<float>&);
 
+    float param (const char* id) const { return apvts.getRawParameterValue (id)->load(); }
+
+    WavetableBank bank;      // doit rester déclaré avant "synth"
+    MonoCapableSynth synth;
+
+    // Effets
+    juce::dsp::Chorus<float> chorus;
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine;
+    juce::Reverb reverb;
+    float lastMaster = 1.0f;
+
+    // Séquenceur : état interne
     int seqNote = -1;                 // note actuellement tenue par le séquenceur
     juce::int64 seqNoteOffAbs = 0;    // instant (en échantillons) de son note-off
     juce::int64 sampleClock = 0;
     double freeBeat = 0.0;            // position en temps quand l'hôte ne joue pas
-
-    WavetableBank bank;      // doit rester déclaré avant "synth"
-    juce::Synthesiser synth;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MonSyntheProcessor)
 };

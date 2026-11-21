@@ -140,7 +140,6 @@ void StepGrid::paint (juce::Graphics& g)
     const bool seqOn = *proc.apvts.getRawParameterValue ("seqOn") > 0.5f;
     const int playing = proc.currentStep.load();
 
-    // Numéros de ligne
     g.setFont (Cyber::mono (12.0f, true));
     for (int row = 0; row < StepSequencerData::maxBars; ++row)
     {
@@ -278,7 +277,7 @@ void StepGrid::refresh()
 //==============================================================================
 // Éditeur
 //==============================================================================
-MonSyntheEditor::Knob* MonSyntheEditor::makeKnob (const juce::String& paramId, const juce::String& name,
+MonSyntheEditor::Knob* MonSyntheEditor::makeKnob (int pg, const juce::String& paramId, const juce::String& name,
                                                   juce::Colour colour, bool linear)
 {
     auto k = std::make_unique<Knob>();
@@ -305,11 +304,14 @@ MonSyntheEditor::Knob* MonSyntheEditor::makeKnob (const juce::String& paramId, c
     addAndMakeVisible (k->label);
     k->attachment = std::make_unique<APVTS::SliderAttachment> (proc.apvts, paramId, k->slider);
 
+    pageItems.push_back ({ &k->slider, pg });
+    pageItems.push_back ({ &k->label, pg });
+
     knobs.push_back (std::move (k));
     return knobs.back().get();
 }
 
-void MonSyntheEditor::setupCombo (juce::ComboBox& box, juce::Label& label, const juce::String& title,
+void MonSyntheEditor::setupCombo (int pg, juce::ComboBox& box, juce::Label& label, const juce::String& title,
                                   juce::Colour colour, const juce::StringArray& items)
 {
     box.addItemList (items, 1);
@@ -322,6 +324,15 @@ void MonSyntheEditor::setupCombo (juce::ComboBox& box, juce::Label& label, const
     label.setJustificationType (juce::Justification::centred);
     label.setColour (juce::Label::textColourId, Cyber::grey);
     addAndMakeVisible (label);
+
+    pageItems.push_back ({ &box, pg });
+    pageItems.push_back ({ &label, pg });
+}
+
+void MonSyntheEditor::updatePageVisibility()
+{
+    for (auto& item : pageItems)
+        item.comp->setVisible (item.page == page);
 }
 
 MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
@@ -329,79 +340,152 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
 {
     setLookAndFeel (&laf);
 
-    waveKnob = makeKnob ("position", "POSITION", Cyber::cyan);
+    using namespace Cyber;
 
-    unisonKnobs = { makeKnob ("unison", "VOIX", Cyber::blue),
-                    makeKnob ("detune", "DESACCORD", Cyber::blue),
-                    makeKnob ("spread", "STEREO", Cyber::blue) };
+    // ------------------------------------------------------------ Page OSC
+    waveKnob = makeKnob (pageOsc, "position", "POSITION", cyan);
 
-    filterKnobs = { makeKnob ("cutoff", "CUTOFF", Cyber::orange),
-                    makeKnob ("resonance", "RESO", Cyber::orange) };
+    oscBKnobs = { makeKnob (pageOsc, "oscBPos",   "POSITION", blue),
+                  makeKnob (pageOsc, "oscBOct",   "OCTAVE",   blue),
+                  makeKnob (pageOsc, "oscBTune",  "ACCORD",   blue),
+                  makeKnob (pageOsc, "oscBLevel", "NIVEAU",   blue),
+                  makeKnob (pageOsc, "subLevel",  "SUB",      cyan) };
 
-    lfoKnobs = { makeKnob ("lfoRate", "VITESSE", Cyber::magenta),
-                 makeKnob ("lfoDepth", "INTENSITE", Cyber::magenta) };
+    unisonKnobs = { makeKnob (pageOsc, "unison", "VOIX",      magenta),
+                    makeKnob (pageOsc, "detune", "DESACCORD", magenta),
+                    makeKnob (pageOsc, "spread", "STEREO",    magenta) };
 
-    modKnobs = { makeKnob ("modAttack", "ATTACK", Cyber::violet),
-                 makeKnob ("modDecay", "DECAY", Cyber::violet),
-                 makeKnob ("modSustain", "SUSTAIN", Cyber::violet),
-                 makeKnob ("modRelease", "RELEASE", Cyber::violet),
-                 makeKnob ("modAmount", "QUANTITE", Cyber::violet) };
-
-    ampKnobs = { makeKnob ("attack", "ATTACK", Cyber::lime),
-                 makeKnob ("decay", "DECAY", Cyber::lime),
-                 makeKnob ("sustain", "SUSTAIN", Cyber::lime),
-                 makeKnob ("release", "RELEASE", Cyber::lime) };
-
-    // LFO : forme
-    setupCombo (lfoShapeBox, lfoShapeLabel, "FORME", Cyber::magenta,
+    setupCombo (pageOsc, lfoShapeBox, lfoShapeLabel, "FORME", violet,
                 juce::StringArray { "Sinus", "Triangle", "Saw", "Carre" });
     lfoShapeAttachment = std::make_unique<APVTS::ComboBoxAttachment> (proc.apvts, "lfoShape", lfoShapeBox);
 
-    // Séquenceur
+    lfoKnobs = { makeKnob (pageOsc, "lfoRate",  "VITESSE",   violet),
+                 makeKnob (pageOsc, "lfoDepth", "INTENSITE", violet) };
+
+    modKnobs = { makeKnob (pageOsc, "modAttack",  "ATTACK",  lime),
+                 makeKnob (pageOsc, "modDecay",   "DECAY",   lime),
+                 makeKnob (pageOsc, "modSustain", "SUSTAIN", lime),
+                 makeKnob (pageOsc, "modRelease", "RELEASE", lime),
+                 makeKnob (pageOsc, "modAmount",  "QUANTITE", lime) };
+
+    // ------------------------------------------------------------ Page FILTRE
+    setupCombo (pageFilter, filterTypeBox, filterTypeLabel, "TYPE", orange,
+                juce::StringArray { "LP 12", "LP 24", "HP", "BP" });
+    filterTypeAttachment = std::make_unique<APVTS::ComboBoxAttachment> (proc.apvts, "filterType", filterTypeBox);
+
+    filterKnobs = { makeKnob (pageFilter, "cutoff",       "CUTOFF",  orange),
+                    makeKnob (pageFilter, "resonance",    "RESO",    orange),
+                    makeKnob (pageFilter, "drive",        "DRIVE",   orange),
+                    makeKnob (pageFilter, "fltEnvAmount", "ENV AMT", orange) };
+
+    fltEnvKnobs = { makeKnob (pageFilter, "fltAttack",  "ATTACK",  yellow),
+                    makeKnob (pageFilter, "fltDecay",   "DECAY",   yellow),
+                    makeKnob (pageFilter, "fltSustain", "SUSTAIN", yellow),
+                    makeKnob (pageFilter, "fltRelease", "RELEASE", yellow) };
+
+    monoButton.setClickingTogglesState (true);
+    monoButton.setColour (juce::TextButton::buttonOnColourId, cyan);
+    monoButton.setColour (juce::TextButton::textColourOffId, cyan);
+    monoButton.setColour (juce::TextButton::textColourOnId, juce::Colours::white);
+    monoButton.onStateChange = [this] { monoButton.setButtonText (monoButton.getToggleState() ? "MONO" : "POLY"); };
+    addAndMakeVisible (monoButton);
+    monoAttachment = std::make_unique<APVTS::ButtonAttachment> (proc.apvts, "mono", monoButton);
+    monoButton.setButtonText (monoButton.getToggleState() ? "MONO" : "POLY");
+    pageItems.push_back ({ &monoButton, pageFilter });
+
+    jeuKnobs = { makeKnob (pageFilter, "glide",     "GLIDE",      cyan),
+                 makeKnob (pageFilter, "bendRange", "PITCH BEND", cyan),
+                 makeKnob (pageFilter, "master",    "VOLUME",     cyan) };
+
+    ampKnobs = { makeKnob (pageFilter, "attack",  "ATTACK",  lime),
+                 makeKnob (pageFilter, "decay",   "DECAY",   lime),
+                 makeKnob (pageFilter, "sustain", "SUSTAIN", lime),
+                 makeKnob (pageFilter, "release", "RELEASE", lime) };
+
+    // ------------------------------------------------------------ Page FX
+    chorusKnobs = { makeKnob (pageFx, "chorusMix",   "MIX",        violet),
+                    makeKnob (pageFx, "chorusRate",  "VITESSE",    violet),
+                    makeKnob (pageFx, "chorusDepth", "PROFONDEUR", violet) };
+
+    delayKnobs = { makeKnob (pageFx, "delayTime",     "TEMPS",    blue),
+                   makeKnob (pageFx, "delayFeedback", "FEEDBACK", blue),
+                   makeKnob (pageFx, "delayMix",      "MIX",      blue) };
+
+    reverbKnobs = { makeKnob (pageFx, "reverbSize", "TAILLE", magenta),
+                    makeKnob (pageFx, "reverbDamp", "AMORTI", magenta),
+                    makeKnob (pageFx, "reverbMix",  "MIX",    magenta) };
+
+    // ------------------------------------------------------------ Page SEQ
     seqButton.setClickingTogglesState (true);
-    seqButton.setColour (juce::TextButton::buttonOnColourId, Cyber::yellow);
-    seqButton.setColour (juce::TextButton::textColourOffId, Cyber::yellow);
+    seqButton.setColour (juce::TextButton::buttonOnColourId, yellow);
+    seqButton.setColour (juce::TextButton::textColourOffId, yellow);
     seqButton.setColour (juce::TextButton::textColourOnId, juce::Colours::white);
     seqButton.onStateChange = [this] { seqButton.setButtonText (seqButton.getToggleState() ? "SEQ ON" : "SEQ OFF"); };
     addAndMakeVisible (seqButton);
     seqButtonAttachment = std::make_unique<APVTS::ButtonAttachment> (proc.apvts, "seqOn", seqButton);
     seqButton.setButtonText (seqButton.getToggleState() ? "SEQ ON" : "SEQ OFF");
+    pageItems.push_back ({ &seqButton, pageSeq });
 
-    setupCombo (barsBox, barsLabel, "LONGUEUR", Cyber::yellow,
+    setupCombo (pageSeq, barsBox, barsLabel, "LONGUEUR", yellow,
                 juce::StringArray { "1 mesure", "2 mesures", "3 mesures", "4 mesures" });
     barsAttachment = std::make_unique<APVTS::ComboBoxAttachment> (proc.apvts, "seqBars", barsBox);
 
-    setupCombo (rateBox, rateLabel, "VITESSE", Cyber::yellow, juce::StringArray { "1/8", "1/16", "1/32" });
+    setupCombo (pageSeq, rateBox, rateLabel, "VITESSE", yellow, juce::StringArray { "1/8", "1/16", "1/32" });
     rateAttachment = std::make_unique<APVTS::ComboBoxAttachment> (proc.apvts, "seqRate", rateBox);
 
-    gateKnob = makeKnob ("seqGate", "GATE", Cyber::yellow, true);
-    tempoKnob = makeKnob ("seqTempo", "TEMPO (hors lecture)", Cyber::yellow, true);
+    gateKnob = makeKnob (pageSeq, "seqGate", "GATE", yellow, true);
+    tempoKnob = makeKnob (pageSeq, "seqTempo", "TEMPO (hors lecture)", yellow, true);
 
     addAndMakeVisible (grid);
+    pageItems.push_back ({ &grid, pageSeq });
 
-    // Presets
+    // ------------------------------------------------------------ Onglets
+    const char* tabNames[] = { "OSC", "FILTRE", "FX", "SEQ" };
+    const juce::Colour tabColours[] = { cyan, orange, violet, yellow };
+
+    for (size_t i = 0; i < tabButtons.size(); ++i)
+    {
+        auto& b = tabButtons[i];
+        b.setButtonText (tabNames[i]);
+        b.setClickingTogglesState (true);
+        b.setRadioGroupId (1001);
+        b.setColour (juce::TextButton::buttonOnColourId, tabColours[i]);
+        b.setColour (juce::TextButton::textColourOffId, tabColours[i]);
+        b.setColour (juce::TextButton::textColourOnId, juce::Colours::white);
+        b.onClick = [this, i]
+        {
+            page = (int) i;
+            updatePageVisibility();
+            resized();
+            repaint();
+        };
+        addAndMakeVisible (b);
+    }
+    tabButtons[0].setToggleState (true, juce::dontSendNotification);
+
+    // ------------------------------------------------------------ Presets
     presetBox.setTextWhenNothingSelected ("PRESETS");
     presetBox.setTextWhenNoChoicesAvailable ("(aucun preset)");
-    presetBox.setColour (juce::ComboBox::textColourId, Cyber::cyan);
-    presetBox.setColour (juce::ComboBox::arrowColourId, Cyber::cyan);
+    presetBox.setColour (juce::ComboBox::textColourId, cyan);
+    presetBox.setColour (juce::ComboBox::arrowColourId, cyan);
     addAndMakeVisible (presetBox);
 
-    nameEditor.setFont (Cyber::mono (13.0f));
-    nameEditor.setTextToShowWhenEmpty ("nom du preset", Cyber::grey);
+    nameEditor.setFont (mono (13.0f));
+    nameEditor.setTextToShowWhenEmpty ("nom du preset", grey);
     nameEditor.setMultiLine (false);
     nameEditor.setReturnKeyStartsNewLine (false);
     addAndMakeVisible (nameEditor);
 
     for (auto* b : { &prevButton, &nextButton })
     {
-        b->setColour (juce::TextButton::buttonOnColourId, Cyber::cyan);
-        b->setColour (juce::TextButton::textColourOffId, Cyber::cyan);
+        b->setColour (juce::TextButton::buttonOnColourId, cyan);
+        b->setColour (juce::TextButton::textColourOffId, cyan);
         addAndMakeVisible (b);
     }
-    saveButton.setColour (juce::TextButton::buttonOnColourId, Cyber::lime);
-    saveButton.setColour (juce::TextButton::textColourOffId, Cyber::lime);
-    deleteButton.setColour (juce::TextButton::buttonOnColourId, Cyber::magenta);
-    deleteButton.setColour (juce::TextButton::textColourOffId, Cyber::magenta);
+    saveButton.setColour (juce::TextButton::buttonOnColourId, lime);
+    saveButton.setColour (juce::TextButton::textColourOffId, lime);
+    deleteButton.setColour (juce::TextButton::buttonOnColourId, magenta);
+    deleteButton.setColour (juce::TextButton::textColourOffId, magenta);
     addAndMakeVisible (saveButton);
     addAndMakeVisible (deleteButton);
 
@@ -447,7 +531,8 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     };
 
     refreshPresetList();
-    setSize (900, 652);      // en dernier : resized() a besoin que tout soit créé
+    updatePageVisibility();
+    setSize (1000, 426);      // en dernier : resized() a besoin que tout soit créé
     startTimerHz (30);
 }
 
@@ -483,14 +568,18 @@ void MonSyntheEditor::stepPreset (int delta)
 
 void MonSyntheEditor::timerCallback()
 {
-    const float pos = *proc.apvts.getRawParameterValue ("position");
-    if (! juce::approximatelyEqual (pos, lastPos))
+    if (page == pageOsc)
     {
-        lastPos = pos;
-        repaint (scopeArea);
+        const float pos = *proc.apvts.getRawParameterValue ("position");
+        if (! juce::approximatelyEqual (pos, lastPos))
+        {
+            lastPos = pos;
+            repaint (scopeArea);
+        }
     }
 
-    grid.refresh();
+    if (page == pageSeq)
+        grid.refresh();
 
     if (deleteArmed > 0 && --deleteArmed == 0)
         deleteButton.setButtonText ("SUPPR");
@@ -510,6 +599,9 @@ void MonSyntheEditor::placeCombo (juce::Label& label, juce::ComboBox& box, juce:
 
 void MonSyntheEditor::layoutRow (const std::vector<Knob*>& items, juce::Rectangle<int> content)
 {
+    if (items.empty())
+        return;
+
     const int w = content.getWidth() / (int) items.size();
     for (auto* k : items)
         placeKnob (k, content.removeFromLeft (w));
@@ -522,20 +614,27 @@ void MonSyntheEditor::resized()
 
     auto contentOf = [] (juce::Rectangle<int> section) { return section.withTrimmedTop (32).reduced (10, 6); };
 
-    // En-tête : presets
+    // En-tête : onglets + presets
     {
-        juce::Rectangle<int> bar (270, 16, getWidth() - 270 - 14, 28);
+        juce::Rectangle<int> tabs (108, 16, 4 * 66 + 3 * 4, 28);
+        for (auto& b : tabButtons)
+        {
+            b.setBounds (tabs.removeFromLeft (66));
+            tabs.removeFromLeft (4);
+        }
+
+        juce::Rectangle<int> bar (410, 16, getWidth() - 410 - 14, 28);
         prevButton.setBounds (bar.removeFromLeft (28));
         bar.removeFromLeft (4);
-        presetBox.setBounds (bar.removeFromLeft (210));
+        presetBox.setBounds (bar.removeFromLeft (200));
         bar.removeFromLeft (4);
         nextButton.setBounds (bar.removeFromLeft (28));
         bar.removeFromLeft (12);
-        nameEditor.setBounds (bar.removeFromLeft (140));
+        nameEditor.setBounds (bar.removeFromLeft (150));
         bar.removeFromLeft (6);
-        saveButton.setBounds (bar.removeFromLeft (64));
+        saveButton.setBounds (bar.removeFromLeft (60));
         bar.removeFromLeft (6);
-        deleteButton.setBounds (bar.removeFromLeft (64));
+        deleteButton.setBounds (bar.removeFromLeft (60));
     }
 
     auto area = getLocalBounds().reduced (14);
@@ -543,61 +642,128 @@ void MonSyntheEditor::resized()
     auto row1 = area.removeFromTop (176);
     area.removeFromTop (14);
     auto row2 = area.removeFromTop (148);
-    area.removeFromTop (14);
-    seqArea = area;
 
-    // Ligne 1 : wavetable + unison + filtre
-    waveArea = row1.removeFromLeft (400);
-    row1.removeFromLeft (16);
-    unisonArea = row1.removeFromLeft (250);
-    row1.removeFromLeft (16);
-    filterArea = row1;
+    panels.clear();
+    auto addPanel = [this] (int pg, juce::Rectangle<int> r, const char* title, juce::Colour c)
+    {
+        panels.push_back ({ pg, r, title, c });
+    };
 
-    auto c = contentOf (waveArea);
-    scopeArea = c.removeFromLeft (240);
-    c.removeFromLeft (12);
-    placeKnob (waveKnob, c);
+    // ------------------------------------------------------------ Page OSC
+    {
+        auto r1 = row1, r2 = row2;
 
-    layoutRow (unisonKnobs, contentOf (unisonArea));
-    layoutRow (filterKnobs, contentOf (filterArea));
+        auto waveArea = r1.removeFromLeft (440);
+        r1.removeFromLeft (16);
+        auto oscBArea = r1;
 
-    // Ligne 2 : LFO + enveloppe de modulation + enveloppe de volume
-    lfoArea = row2.removeFromLeft (210);
-    row2.removeFromLeft (16);
-    modArea = row2.removeFromLeft (350);
-    row2.removeFromLeft (16);
-    ampArea = row2;
+        auto unisonArea = r2.removeFromLeft (300);
+        r2.removeFromLeft (16);
+        auto lfoArea = r2.removeFromLeft (300);
+        r2.removeFromLeft (16);
+        auto modArea = r2;
 
-    auto lc = contentOf (lfoArea);
-    const int w = lc.getWidth() / 3;
-    placeCombo (lfoShapeLabel, lfoShapeBox, lc.removeFromLeft (w).reduced (3, 0).translated (0, 8));
-    layoutRow (lfoKnobs, lc);
+        addPanel (pageOsc, waveArea,   "WAVETABLE A",  Cyber::cyan);
+        addPanel (pageOsc, oscBArea,   "OSC B + SUB",  Cyber::blue);
+        addPanel (pageOsc, unisonArea, "UNISON",       Cyber::magenta);
+        addPanel (pageOsc, lfoArea,    "LFO",          Cyber::violet);
+        addPanel (pageOsc, modArea,    "MOD ENV",      Cyber::lime);
 
-    layoutRow (modKnobs, contentOf (modArea));
-    layoutRow (ampKnobs, contentOf (ampArea));
+        auto c = contentOf (waveArea);
+        scopeArea = c.removeFromLeft (270);
+        c.removeFromLeft (12);
+        placeKnob (waveKnob, c);
 
-    // Séquenceur
-    auto sc = contentOf (seqArea);
-    auto strip = sc.removeFromTop (44);
-    sc.removeFromTop (6);
-    grid.setBounds (sc);
+        layoutRow (oscBKnobs, contentOf (oscBArea));
+        layoutRow (unisonKnobs, contentOf (unisonArea));
 
-    seqButton.setBounds (strip.removeFromLeft (100).withTrimmedTop (16).withHeight (26));
-    strip.removeFromLeft (12);
-    placeCombo (barsLabel, barsBox, strip.removeFromLeft (130));
-    strip.removeFromLeft (12);
-    placeCombo (rateLabel, rateBox, strip.removeFromLeft (110));
-    strip.removeFromLeft (20);
-    placeKnob (gateKnob, strip.removeFromLeft (200));
-    strip.removeFromLeft (16);
-    placeKnob (tempoKnob, strip.removeFromLeft (220));
+        auto lc = contentOf (lfoArea);
+        const int w = lc.getWidth() / 3;
+        placeCombo (lfoShapeLabel, lfoShapeBox, lc.removeFromLeft (w).reduced (3, 0).translated (0, 8));
+        layoutRow (lfoKnobs, lc);
+
+        layoutRow (modKnobs, contentOf (modArea));
+    }
+
+    // ------------------------------------------------------------ Page FILTRE
+    {
+        auto r1 = row1, r2 = row2;
+
+        auto filterArea = r1.removeFromLeft (520);
+        r1.removeFromLeft (16);
+        auto fltEnvArea = r1;
+
+        auto jeuArea = r2.removeFromLeft (520);
+        r2.removeFromLeft (16);
+        auto ampArea = r2;
+
+        addPanel (pageFilter, filterArea, "FILTRE",     Cyber::orange);
+        addPanel (pageFilter, fltEnvArea, "FILTRE ENV", Cyber::yellow);
+        addPanel (pageFilter, jeuArea,    "JEU",        Cyber::cyan);
+        addPanel (pageFilter, ampArea,    "AMP ENV",    Cyber::lime);
+
+        auto fc = contentOf (filterArea);
+        placeCombo (filterTypeLabel, filterTypeBox, fc.removeFromLeft (100).reduced (3, 0).translated (0, 8));
+        layoutRow (filterKnobs, fc);
+
+        layoutRow (fltEnvKnobs, contentOf (fltEnvArea));
+
+        auto jc = contentOf (jeuArea);
+        const int w = jc.getWidth() / 4;
+        auto first = jc.removeFromLeft (w);
+        monoButton.setBounds (first.withSizeKeepingCentre (w - 20, 28).translated (0, 8));
+        layoutRow (jeuKnobs, jc);
+
+        layoutRow (ampKnobs, contentOf (ampArea));
+    }
+
+    // ------------------------------------------------------------ Page FX
+    {
+        auto r1 = row1;
+        const int w = (r1.getWidth() - 32) / 3;
+
+        auto chorusArea = r1.removeFromLeft (w);
+        r1.removeFromLeft (16);
+        auto delayArea = r1.removeFromLeft (w);
+        r1.removeFromLeft (16);
+        auto reverbArea = r1;
+
+        addPanel (pageFx, chorusArea, "CHORUS", Cyber::violet);
+        addPanel (pageFx, delayArea,  "DELAY",  Cyber::blue);
+        addPanel (pageFx, reverbArea, "REVERB", Cyber::magenta);
+
+        layoutRow (chorusKnobs, contentOf (chorusArea));
+        layoutRow (delayKnobs, contentOf (delayArea));
+        layoutRow (reverbKnobs, contentOf (reverbArea));
+    }
+
+    // ------------------------------------------------------------ Page SEQ
+    {
+        const juce::Rectangle<int> seqArea (row1.getX(), row1.getY(), row1.getWidth(), 300);
+        addPanel (pageSeq, seqArea, "SEQUENCEUR", Cyber::yellow);
+
+        auto sc = contentOf (seqArea);
+        auto strip = sc.removeFromTop (44);
+        sc.removeFromTop (6);
+        grid.setBounds (sc);
+
+        seqButton.setBounds (strip.removeFromLeft (100).withTrimmedTop (16).withHeight (26));
+        strip.removeFromLeft (12);
+        placeCombo (barsLabel, barsBox, strip.removeFromLeft (130));
+        strip.removeFromLeft (12);
+        placeCombo (rateLabel, rateBox, strip.removeFromLeft (110));
+        strip.removeFromLeft (20);
+        placeKnob (gateKnob, strip.removeFromLeft (240));
+        strip.removeFromLeft (16);
+        placeKnob (tempoKnob, strip.removeFromLeft (260));
+    }
 }
 
 //==============================================================================
-void MonSyntheEditor::drawPanel (juce::Graphics& g, juce::Rectangle<int> area,
-                                 const juce::String& title, juce::Colour colour)
+void MonSyntheEditor::drawPanel (juce::Graphics& g, const Panel& panel)
 {
-    const auto r = area.toFloat();
+    const auto r = panel.area.toFloat();
+    const auto colour = panel.colour;
     const float c = 10.0f;     // coins coupés
 
     juce::Path p;
@@ -619,7 +785,8 @@ void MonSyntheEditor::drawPanel (juce::Graphics& g, juce::Rectangle<int> area,
     g.setColour (colour);
     g.fillRect (r.getX() + 14.0f, r.getY() + 10.0f, 4.0f, 12.0f);
     g.setFont (Cyber::mono (13.0f, true));
-    g.drawText ("// " + title, juce::Rectangle<float> (r.getX() + 24.0f, r.getY() + 6.0f, r.getWidth() - 40.0f, 20.0f),
+    g.drawText ("// " + panel.title,
+                juce::Rectangle<float> (r.getX() + 24.0f, r.getY() + 6.0f, r.getWidth() - 40.0f, 20.0f),
                 juce::Justification::centredLeft, false);
 
     g.setColour (colour.withAlpha (0.3f));
@@ -702,20 +869,17 @@ void MonSyntheEditor::paint (juce::Graphics& g)
     // Titre (effet d'aberration chromatique)
     g.setFont (Cyber::mono (30.0f, true));
     g.setColour (Cyber::magenta.withAlpha (0.85f));
-    g.drawText ("MS1", 17, 11, 250, 36, juce::Justification::centredLeft, false);
+    g.drawText ("MS1", 17, 11, 90, 36, juce::Justification::centredLeft, false);
     g.setColour (Cyber::cyan);
-    g.drawText ("MS1", 14, 10, 250, 36, juce::Justification::centredLeft, false);
+    g.drawText ("MS1", 14, 10, 90, 36, juce::Justification::centredLeft, false);
 
     g.setGradientFill (juce::ColourGradient (Cyber::cyan, 14.0f, 0.0f, Cyber::magenta, w - 14.0f, 0.0f, false));
     g.fillRect (14.0f, 56.0f, w - 28.0f, 2.0f);
 
-    drawPanel (g, waveArea,   "WAVETABLE",  Cyber::cyan);
-    drawPanel (g, unisonArea, "UNISON",     Cyber::blue);
-    drawPanel (g, filterArea, "FILTRE",     Cyber::orange);
-    drawPanel (g, lfoArea,    "LFO",        Cyber::magenta);
-    drawPanel (g, modArea,    "MOD ENV",    Cyber::violet);
-    drawPanel (g, ampArea,    "AMP ENV",    Cyber::lime);
-    drawPanel (g, seqArea,    "SEQUENCEUR", Cyber::yellow);
+    for (const auto& panel : panels)
+        if (panel.page == page)
+            drawPanel (g, panel);
 
-    drawScope (g, scopeArea.toFloat());
+    if (page == pageOsc)
+        drawScope (g, scopeArea.toFloat());
 }
