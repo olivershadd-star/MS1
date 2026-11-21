@@ -328,7 +328,6 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     : juce::AudioProcessorEditor (&p), proc (p), grid (p, Cyber::yellow)
 {
     setLookAndFeel (&laf);
-    setSize (900, 652);
 
     waveKnob = makeKnob ("position", "POSITION", Cyber::cyan);
 
@@ -448,6 +447,7 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     };
 
     refreshPresetList();
+    setSize (900, 652);      // en dernier : resized() a besoin que tout soit créé
     startTimerHz (30);
 }
 
@@ -517,6 +517,9 @@ void MonSyntheEditor::layoutRow (const std::vector<Knob*>& items, juce::Rectangl
 
 void MonSyntheEditor::resized()
 {
+    if (waveKnob == nullptr)     // composants pas encore créés
+        return;
+
     auto contentOf = [] (juce::Rectangle<int> section) { return section.withTrimmedTop (32).reduced (10, 6); };
 
     // En-tête : presets
