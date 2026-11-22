@@ -436,39 +436,64 @@ namespace
 
 const MonSyntheEditor::MenuDef& MonSyntheEditor::menuAt (int index)
 {
+    // Ordre = ordre des boutons (2 colonnes, de gauche à droite puis de haut en bas)
     static const MenuDef defs[numMenus] =
     {
         { "OSC A",     0, VizScopeA, VizSpectrum, { { "position", "POSITION" }, { "warpAmtA", "WARP" },
                                                     { "unison", "UNISON" }, { "detune", "DESACCORD" },
-                                                    { "spread", "STEREO" }, { "subLevel", "SUB" } } },
-        { "OSC B",     1, VizScopeB, VizFmRing,   { { "oscBPos", "POSITION" }, { "warpAmtB", "WARP" },
-                                                    { "oscBOct", "OCTAVE" }, { "oscBTune", "ACCORD" },
-                                                    { "oscBLevel", "NIVEAU" }, { "fmAmount", "FM" },
-                                                    { "ringAmount", "RING" } } },
+                                                    { "oscAOct", "OCTAVE" }, { "oscATune", "ACCORD" },
+                                                    { "subLevel", "SUB" }, { "oscALevel", "NIVEAU" } } },
+        { "OSC B",     1, VizScopeB, VizFmRing,   { { "oscBLevel", "NIVEAU" }, { "oscBPos", "POSITION" },
+                                                    { "warpAmtB", "WARP" }, { "oscBOct", "OCTAVE" },
+                                                    { "oscBTune", "ACCORD" }, { "oscBPhase", "PHASE" },
+                                                    { "fmAmount", "FM" }, { "ringAmount", "RING" } } },
         { "FM / RING", 2, VizFmRing, VizScopeB,   { { "fmAmount", "FM" }, { "ringAmount", "RING" },
                                                     { "oscBLevel", "NIVEAU B" }, { "subLevel", "SUB" } } },
         { "UNISON",    3, VizUnison, VizScopeA,   { { "unison", "VOIX" }, { "detune", "DESACCORD" },
-                                                    { "spread", "STEREO" } } },
+                                                    { "spread", "STEREO" }, { "uniBlend", "BLEND" } } },
+        { "BRUIT",     5, VizNoise, VizSpectrum,  { { "noiseLevel", "NIVEAU" }, { "noiseTone", "TON" },
+                                                    { "noiseDecay", "DECAY" } } },
+        { "PITCH",     0, VizPitch, VizScopeA,    { { "pitchEnvAmt", "QUANTITE" }, { "pitchEnvDecay", "DECAY" },
+                                                    { "oscPhase", "PHASE" } } },
         { "FILTRE",    4, VizFilter, VizEnvFilter,{ { "cutoff", "CUTOFF" }, { "resonance", "RESO" },
                                                     { "drive", "DRIVE" }, { "fltEnvAmount", "ENV AMT" },
                                                     { "fltAttack", "ATTACK" }, { "fltDecay", "DECAY" },
                                                     { "fltSustain", "SUSTAIN" }, { "fltRelease", "RELEASE" } } },
+        { "DISTO",     4, VizDisto, VizSpectrum,  { { "distAmt", "QUANTITE" }, { "distMix", "MIX" },
+                                                    { "drive", "DRIVE PRE" } } },
         { "ENV AMP",   5, VizEnvAmp, VizSpectrum, { { "attack", "ATTACK" }, { "decay", "DECAY" },
-                                                    { "sustain", "SUSTAIN" }, { "release", "RELEASE" } } },
+                                                    { "sustain", "SUSTAIN" }, { "release", "RELEASE" },
+                                                    { "velAmp", "VEL > VOL" }, { "velFilter", "VEL > FILTRE" },
+                                                    { "voiceGain", "GAIN" } } },
         { "ENV MOD",   0, VizEnvMod, VizSpectrum, { { "modAttack", "ATTACK" }, { "modDecay", "DECAY" },
                                                     { "modSustain", "SUSTAIN" }, { "modRelease", "RELEASE" },
                                                     { "modAmount", "QUANTITE" } } },
         { "LFO",       1, VizLfo1, VizLfo2,       { { "lfoRate", "VITESSE" }, { "lfoDepth", "INTENSITE" },
                                                     { nullptr, nullptr }, { nullptr, nullptr },
                                                     { "lfo2Rate", "VITESSE" } } },
+        { "LFO 3-4",   1, VizLfo3, VizLfo4,       { { "lfo3Rate", "VITESSE" }, { nullptr, nullptr },
+                                                    { nullptr, nullptr }, { nullptr, nullptr },
+                                                    { "lfo4Rate", "VITESSE" } } },
         { "JEU",       2, VizGlide, VizSpectrum,  { { "glide", "GLIDE" }, { "bendRange", "BEND" } } },
         { "CHORUS",    3, VizChorus, VizSpectrum, { { "chorusMix", "MIX" }, { "chorusRate", "VITESSE" },
-                                                    { "chorusDepth", "PROFONDEUR" } } },
+                                                    { "chorusDepth", "PROFONDEUR" }, { nullptr, nullptr },
+                                                    { "chorusDelay", "DELAI" }, { "chorusFeedback", "FEEDBACK" } } },
+        { "PHASER",    1, VizNone, VizSpectrum,   { { "phaserMix", "MIX" }, { "phaserRate", "VITESSE" },
+                                                    { "phaserDepth", "PROFONDEUR" }, { "phaserFeedback", "FEEDBACK" },
+                                                    { "phaserCentre", "CENTRE" } } },
         { "DELAY",     4, VizDelay, VizSpectrum,  { { "delayTime", "TEMPS" }, { "delayFeedback", "FEEDBACK" },
-                                                    { "delayMix", "MIX" } } },
+                                                    { "delayMix", "MIX" }, { nullptr, nullptr },
+                                                    { "delayLP", "FILTRE AIGU" }, { "delayHP", "FILTRE GRAVE" } } },
         { "REVERB",    5, VizReverb, VizSpectrum, { { "reverbSize", "TAILLE" }, { "reverbDamp", "AMORTI" },
-                                                    { "reverbMix", "MIX" } } },
-        { "VELOCITE",  0, VizSpectrum, VizScopeA, { { "velAmp", "VEL > VOL" }, { "velFilter", "VEL > FILTRE" } } },
+                                                    { "reverbMix", "MIX" }, { nullptr, nullptr },
+                                                    { "reverbPre", "PRE-DELAY" }, { "reverbWidth", "LARGEUR" },
+                                                    { "reverbLP", "FILTRE AIGU" }, { "reverbHP", "FILTRE GRAVE" } } },
+        { "EQ",        3, VizNone, VizNone,       { { "eq1Freq", "FREQ" }, { "eq1Gain", "GAIN" },
+                                                    { "eq1Q", "Q" }, { "eqOut", "SORTIE" } } },
+        { "MASTER",    0, VizComp, VizSpectrum,   { { "compThresh", "SEUIL" }, { "compRatio", "RATIO" },
+                                                    { "compAttack", "ATTAQUE" }, { "compRelease", "RELEASE" },
+                                                    { "compMakeup", "MAKEUP" }, { "compMix", "MIX" },
+                                                    { "limCeil", "LIMITEUR" }, { "width", "LARGEUR" } } },
         { "MATRICE",   4, VizMatrix, VizMatrix,   {} }
     };
     return defs[juce::jlimit (0, numMenus - 1, index)];
@@ -554,6 +579,11 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     setupCombo (filterType, "filterType", 4);
     setupCombo (lfoShape, "lfoShape", 1);    setupCombo (lfoSync, "lfoSync", 1);
     setupCombo (lfo2Shape, "lfo2Shape", 2);  setupCombo (lfo2Sync, "lfo2Sync", 2);
+    setupCombo (lfo3Shape, "lfo3Shape", 3);  setupCombo (lfo3Sync, "lfo3Sync", 3);
+    setupCombo (lfo4Shape, "lfo4Shape", 4);  setupCombo (lfo4Sync, "lfo4Sync", 4);
+    setupCombo (delaySync, "delaySync", 4);  setupCombo (delayMode, "delayMode", 4);
+    setupCombo (noiseType, "noiseType", 5);  setupCombo (phaseMode, "phaseMode", 0);
+    setupCombo (distType, "distType", 4);
 
     styleButton (monoButton, 2);
     monoButton.setButtonText ("MONO");
@@ -573,8 +603,28 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
         addAndMakeVisible (b);
     }
 
+    // --- EQ 8 bandes
+    for (int i = 0; i < 8; ++i)
+    {
+        auto& b = eqBandButtons[(size_t) i];
+        b.setButtonText ("BANDE " + juce::String (i + 1));
+        b.setClickingTogglesState (false);
+        styleButton (b, i % 6);
+        b.onClick = [this, i] { selectEqBand (i); };
+    }
+    for (auto* k : fixedKnobs)
+        k->slider.addMouseListener (this, false);
+
+    styleButton (eqOnButton, 0);
+    eqOnButton.setClickingTogglesState (true);
+    fillChoices (proc.apvts, eqTypeBox, "eq1Type");
+    eqTypeBox.setColour (juce::ComboBox::arrowColourId, Pal::cyan);
+    eqTypeBox.setColour (juce::ComboBox::textColourId, Pal::text);
+    comboRefs.push_back ({ &eqTypeBox, 0 });
+    addAndMakeVisible (eqTypeBox);
+
     // --- Matrice
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < 12; ++i)
     {
         const juce::String n = "mx" + juce::String (i + 1);
         auto& src = mixSrcBox[(size_t) i];
@@ -636,6 +686,31 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     }
     addAndMakeVisible (grid);
 
+    // --- Clavier a l'ecran (3 octaves) et enregistrement
+    keyboard = std::make_unique<juce::MidiKeyboardComponent> (proc.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard);
+    keyboard->setAvailableRange (36, 72);
+    keyboard->setScrollButtonsVisible (false);
+    keyboard->setMidiChannel (1);
+    keyboard->setVelocity (0.8f, true);
+    addChildComponent (*keyboard);
+    applyKeyboardColours();
+
+    styleButton (pianoButton, 1);
+    pianoButton.setClickingTogglesState (true);
+    pianoButton.onClick = [this]
+    {
+        pianoMode = pianoButton.getToggleState();
+        grid.setVisible (! pianoMode);
+        keyboard->setVisible (pianoMode);
+        repaint();
+    };
+    addAndMakeVisible (pianoButton);
+
+    styleButton (recButton, 3);
+    recButton.setClickingTogglesState (true);
+    recAttachment = std::make_unique<APVTS::ButtonAttachment> (proc.apvts, "seqRec", recButton);
+    addAndMakeVisible (recButton);
+
     // --- En-tête : presets
     for (auto* b : { &prevButton, &nextButton, &saveButton, &deleteButton })
         styleButton (*b, 0);
@@ -651,9 +726,31 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
 
     refreshPresetList();
 
+    browser = std::make_unique<PresetBrowser> (proc,
+                                               [this] (int id) { presetBox.setSelectedId (id, juce::sendNotificationSync); },
+                                               [this] { browser->setVisible (false); browserButton.setToggleState (false, juce::dontSendNotification); });
+    addChildComponent (*browser);
+    styleButton (browserButton, 1);
+    browserButton.setClickingTogglesState (true);
+    browserButton.onClick = [this]
+    {
+        if (browserButton.getToggleState())
+        {
+            browser->rebuild();
+            browser->setSelectedId (presetBox.getSelectedId());
+            browser->setVisible (true);
+            browser->toFront (false);
+        }
+        else
+            browser->setVisible (false);
+    };
+    addAndMakeVisible (browserButton);
+
     presetBox.onChange = [this]
     {
         const int id = presetBox.getSelectedId();
+        if (browser != nullptr)
+            browser->setSelectedId (id);
         if (id >= 2000)
         {
             const auto name = presetBox.getText();
@@ -756,6 +853,7 @@ void MonSyntheEditor::selectMenu (int index)
     {
         auto* k = fixedKnobs[i];
         k->attachment.reset();
+        k->paramId = {};
 
         if (def.p[i].id != nullptr)
         {
@@ -763,11 +861,15 @@ void MonSyntheEditor::selectMenu (int index)
             k->slider.setColour (juce::Slider::rotarySliderFillColourId, Pal::role (k->role));
             k->label.setText (def.p[i].label, juce::dontSendNotification);
             k->attachment = std::make_unique<APVTS::SliderAttachment> (proc.apvts, def.p[i].id, k->slider);
+            k->paramId = def.p[i].id;
         }
     }
 
     for (int i = 0; i < numMenus; ++i)
         menuButtons[(size_t) i].setToggleState (i == currentMenu, juce::dontSendNotification);
+
+    if (currentMenu == mEq)
+        selectEqBand (eqBand);
 
     updateMenuVisibility();
     repaint();
@@ -788,18 +890,31 @@ void MonSyntheEditor::updateMenuVisibility()
     for (auto* c : matrixComponents)
         c->setVisible (isMatrix);
 
-    tableA.box.setVisible (currentMenu == 0);
-    warpA.box.setVisible (currentMenu == 0);
-    importAButton.setVisible (currentMenu == 0);
-    tableB.box.setVisible (currentMenu == 1);
-    warpB.box.setVisible (currentMenu == 1);
-    importBButton.setVisible (currentMenu == 1);
-    filterType.box.setVisible (currentMenu == 4);
-    lfoShape.box.setVisible (currentMenu == 7);
-    lfoSync.box.setVisible (currentMenu == 7);
-    lfo2Shape.box.setVisible (currentMenu == 7);
-    lfo2Sync.box.setVisible (currentMenu == 7);
-    monoButton.setVisible (currentMenu == 8);
+    tableA.box.setVisible (currentMenu == mOscA);
+    warpA.box.setVisible (currentMenu == mOscA);
+    importAButton.setVisible (currentMenu == mOscA);
+    tableB.box.setVisible (currentMenu == mOscB);
+    warpB.box.setVisible (currentMenu == mOscB);
+    importBButton.setVisible (currentMenu == mOscB);
+    filterType.box.setVisible (currentMenu == mFilter);
+    lfoShape.box.setVisible (currentMenu == mLfo);
+    lfoSync.box.setVisible (currentMenu == mLfo);
+    lfo2Shape.box.setVisible (currentMenu == mLfo);
+    lfo2Sync.box.setVisible (currentMenu == mLfo);
+    delaySync.box.setVisible (currentMenu == mDelay);
+    delayMode.box.setVisible (currentMenu == mDelay);
+    lfo3Shape.box.setVisible (currentMenu == mLfo34);
+    lfo3Sync.box.setVisible (currentMenu == mLfo34);
+    lfo4Shape.box.setVisible (currentMenu == mLfo34);
+    lfo4Sync.box.setVisible (currentMenu == mLfo34);
+    monoButton.setVisible (currentMenu == mJeu);
+    noiseType.box.setVisible (currentMenu == mNoise);
+    for (auto& b : eqBandButtons)
+        b.setVisible (currentMenu == mEq);
+    eqOnButton.setVisible (currentMenu == mEq);
+    eqTypeBox.setVisible (currentMenu == mEq);
+    phaseMode.box.setVisible (currentMenu == mPitch);
+    distType.box.setVisible (currentMenu == mDisto);
 
     const bool specA = ! isMatrix && def.vizA == VizSpectrum;
     const bool specB = ! isMatrix && ! specA && def.vizB == VizSpectrum;
@@ -853,6 +968,7 @@ void MonSyntheEditor::applyTheme()
 
     nameEditor.applyColourToAllText (Pal::text, true);
     grid.setAccent (Pal::cyan);
+    applyKeyboardColours();
     repaint();
 }
 
@@ -873,32 +989,51 @@ void MonSyntheEditor::updateLeds()
 
         switch (i)
         {
-            case 0: case 1: case 2: case 3:
+            case mOscA: case mOscB: case mFmRing: case mUnison:
                 lvl = active ? 0.35f + 0.65f * pulse (1.3 + 0.4 * i, i) : 0.12f;  break;
-            case 4:  lvl = active ? 0.35f + 0.65f * pulse (2.1, 0.5) : 0.12f;     break;
-            case 5:  lvl = active ? 1.0f : 0.12f;                                  break;
-            case 6:  lvl = active ? 0.35f + 0.65f * pulse (1.7, 1.0) : 0.12f;     break;
-            case 7:
+            case mNoise:  lvl = pv ("noiseLevel") > 0.01f ? 0.3f + 0.7f * pulse (5.0, 0.0) : 0.12f;  break;
+            case mPitch:  lvl = std::abs (pv ("pitchEnvAmt")) > 0.5f ? (active ? 1.0f : 0.6f) : 0.12f;  break;
+            case mFilter: lvl = active ? 0.35f + 0.65f * pulse (2.1, 0.5) : 0.12f;     break;
+            case mDisto:  lvl = pv ("distAmt") > 0.01f ? 0.4f + 0.6f * pulse (7.0, 0.0) : 0.12f;  break;
+            case mEnvAmp: lvl = active ? 1.0f : 0.12f;                                  break;
+            case mEnvMod: lvl = active ? 0.35f + 0.65f * pulse (1.7, 1.0) : 0.12f;     break;
+            case mLfo:
             {
                 const double hz = pv ("lfoSync") > 0.5f ? bpm / 60.0 : (double) pv ("lfoRate");
                 lvl = 0.12f + 0.88f * pulse (juce::jmin (hz, 8.0), 0.0);
                 break;
             }
-            case 8:  lvl = pv ("mono") > 0.5f ? 0.9f : 0.25f;                      break;
-            case 9:  lvl = pv ("chorusMix") > 0.01f ? 0.45f + 0.55f * pulse (pv ("chorusRate"), 0.0) : 0.12f; break;
-            case 10: lvl = pv ("delayMix") > 0.01f
+            case mLfo34:
+            {
+                const double hz = pv ("lfo3Sync") > 0.5f ? bpm / 60.0 : (double) pv ("lfo3Rate");
+                lvl = 0.12f + 0.88f * pulse (juce::jmin (hz, 8.0), 0.0);
+                break;
+            }
+            case mJeu:    lvl = pv ("mono") > 0.5f ? 0.9f : 0.25f;                      break;
+            case mPhaser: lvl = pv ("phaserMix") > 0.01f ? 0.45f + 0.55f * pulse (pv ("phaserRate"), 0.0) : 0.12f; break;
+            case mChorus: lvl = pv ("chorusMix") > 0.01f ? 0.45f + 0.55f * pulse (pv ("chorusRate"), 0.0) : 0.12f; break;
+            case mDelay:  lvl = pv ("delayMix") > 0.01f
                               ? 0.2f + 0.8f * pulse (juce::jmin (1000.0 / (double) juce::jmax (20.0f, pv ("delayTime")), 8.0), 0.0)
                               : 0.12f;
-                     break;
-            case 11: lvl = pv ("reverbMix") > 0.01f ? 0.8f : 0.12f;                break;
-            case 12: lvl = active ? 0.7f : 0.12f;                                  break;
+                          break;
+            case mReverb: lvl = pv ("reverbMix") > 0.01f ? 0.8f : 0.12f;                break;
+            case mEq:
+            {
+                int on = 0;
+                for (int b = 1; b <= 8; ++b)
+                    if (pv (("eq" + juce::String (b) + "On").toRawUTF8()) > 0.5f)
+                        ++on;
+                lvl = on > 0 ? 0.5f + 0.5f * (float) on / 8.0f : 0.12f;
+                break;
+            }
+            case mMaster: lvl = pv ("compThresh") < -0.1f ? 0.4f + 0.6f * pulse (3.0, 0.0) : (active ? 0.7f : 0.12f);  break;
             default:
             {
                 int used = 0;
-                for (int r = 1; r <= 6; ++r)
+                for (int r = 1; r <= 12; ++r)
                     if (std::abs (pv (("mx" + juce::String (r) + "Amt").toRawUTF8())) > 0.01f)
                         ++used;
-                lvl = used > 0 ? 0.5f + 0.5f * (float) used / 6.0f : 0.12f;
+                lvl = used > 0 ? 0.5f + 0.5f * (float) used / 12.0f : 0.12f;
                 break;
             }
         }
@@ -955,20 +1090,23 @@ void MonSyntheEditor::resized()
     nameEditor.setBounds (R (458, 12, 120, 28));
     saveButton.setBounds (R (582, 12, 52, 28));
     deleteButton.setBounds (R (638, 12, 62, 28));
-    headerSpectrum.setBounds (R (712, 8, 290, 38));
+    browserButton.setBounds (R (706, 12, 78, 28));
+    headerSpectrum.setBounds (R (792, 8, 210, 38));
+    if (browser != nullptr)
+        browser->setBounds (R (184, 60, 828, 476));
     hueBar.setBounds (R (1020, 12, 240, 28));
 
     // Menus
-    menuPanel = R (8, 60, 132, 476);
+    menuPanel = R (8, 60, 168, 476);
     for (int i = 0; i < numMenus; ++i)
-        menuButtons[(size_t) i].setBounds (R (14, 88 + i * 31, 120, 28));
+        menuButtons[(size_t) i].setBounds (R (14 + (i % 2) * 78, 90 + (i / 2) * 44, 74, 38));
 
     // Écrans
-    screenAPanel = R (148, 60, 426, 476);
-    screenBPanel = R (582, 60, 426, 476);
-    gfxA   = R (158, 90, 406, 236);   gfxB   = R (592, 90, 406, 236);
-    stripA = R (158, 332, 406, 28);   stripB = R (592, 332, 406, 28);
-    knobsA = R (158, 366, 406, 162);  knobsB = R (592, 366, 406, 162);
+    screenAPanel = R (184, 60, 410, 476);
+    screenBPanel = R (602, 60, 410, 476);
+    gfxA   = R (194, 90, 390, 236);   gfxB   = R (612, 90, 390, 236);
+    stripA = R (194, 332, 390, 28);   stripB = R (612, 332, 390, 28);
+    knobsA = R (194, 366, 390, 162);  knobsB = R (612, 366, 390, 162);
     scopeArea = gfxA;
 
     for (int s = 0; s < 2; ++s)
@@ -986,11 +1124,15 @@ void MonSyntheEditor::resized()
             tableB.box.setBounds (first);       warpB.box.setBounds (second);       importBButton.setBounds (third);
             filterType.box.setBounds (first);
             lfoShape.box.setBounds (first);     lfoSync.box.setBounds (second);
+            lfo3Shape.box.setBounds (first);    lfo3Sync.box.setBounds (second);
             monoButton.setBounds (first);
+            noiseType.box.setBounds (first);    phaseMode.box.setBounds (first);    distType.box.setBounds (first);
         }
         else
         {
             lfo2Shape.box.setBounds (first);    lfo2Sync.box.setBounds (second);
+            delaySync.box.setBounds (first);    delayMode.box.setBounds (second);
+            lfo4Shape.box.setBounds (first);    lfo4Sync.box.setBounds (second);
         }
     }
 
@@ -1002,32 +1144,39 @@ void MonSyntheEditor::resized()
         layoutRow (row, s == 0 ? knobsA : knobsB);
     }
 
+    // EQ (graphique sur les deux écrans, bandes sous le graphique)
+    eqGraphArea = gfxA.getUnion (gfxB);
+    for (int i = 0; i < 8; ++i)
+        eqBandButtons[(size_t) i].setBounds (R (194 + i * 101, 332, 97, 28));
+    eqOnButton.setBounds (R (632, 384, 160, 34));
+    eqTypeBox.setBounds (R (632, 430, 160, 30));
+
     // Matrice (occupe les deux écrans)
-    matrixArea = R (158, 92, 840, 436);
+    matrixArea = R (194, 92, 808, 436);
     {
         const int x0 = matrixArea.getX();
-        mixHdrSrc.setBounds (x0, matrixArea.getY(), S (230.0f), S (22.0f));
-        mixHdrDst.setBounds (x0 + S (266.0f), matrixArea.getY(), S (230.0f), S (22.0f));
-        mixHdrAmt.setBounds (x0 + S (510.0f), matrixArea.getY(), S (330.0f), S (22.0f));
+        mixHdrSrc.setBounds (x0, matrixArea.getY(), S (220.0f), S (22.0f));
+        mixHdrDst.setBounds (x0 + S (256.0f), matrixArea.getY(), S (220.0f), S (22.0f));
+        mixHdrAmt.setBounds (x0 + S (496.0f), matrixArea.getY(), S (312.0f), S (22.0f));
 
-        for (int i = 0; i < 6; ++i)
+        for (int i = 0; i < 12; ++i)
         {
-            const int y = matrixArea.getY() + S (26.0f) + i * S (60.0f) + S (15.0f);
-            mixSrcBox[(size_t) i].setBounds (x0, y, S (230.0f), S (30.0f));
-            mixDstBox[(size_t) i].setBounds (x0 + S (266.0f), y, S (230.0f), S (30.0f));
-            placeKnob (mixAmt[(size_t) i], juce::Rectangle<int> (x0 + S (510.0f), y, S (330.0f), S (30.0f)));
+            const int y = matrixArea.getY() + S (26.0f) + i * S (34.0f) + S (2.0f);
+            mixSrcBox[(size_t) i].setBounds (x0, y, S (220.0f), S (28.0f));
+            mixDstBox[(size_t) i].setBounds (x0 + S (256.0f), y, S (220.0f), S (28.0f));
+            placeKnob (mixAmt[(size_t) i], juce::Rectangle<int> (x0 + S (496.0f), y, S (312.0f), S (28.0f)));
         }
     }
 
     // Colonne de droite
-    macrosPanel = R (1016, 60, 256, 250);
+    macrosPanel = R (1020, 60, 252, 250);
     for (int i = 0; i < 4; ++i)
         placeKnob (macroKnobs[(size_t) i],
-                   R (1024 + (i % 2) * 122, 90 + (i / 2) * 108, 120, 104).reduced (S (4.0f)));
+                   R (1028 + (i % 2) * 120, 90 + (i / 2) * 108, 118, 104).reduced (S (4.0f)));
 
-    outPanel = R (1016, 318, 256, 218);
-    placeKnob (masterKnob, R (1024, 346, 124, 182));
-    meterArea = R (1160, 352, 24, 168);
+    outPanel = R (1020, 318, 252, 218);
+    placeKnob (masterKnob, R (1028, 346, 120, 182));
+    meterArea = R (1158, 352, 24, 168);
     ledsArea  = R (1196, 352, 66, 120);
 
     // Séquenceur
@@ -1038,6 +1187,15 @@ void MonSyntheEditor::resized()
     placeKnob (gateKnob, R (18, 652, 150, 20));
     placeKnob (tempoKnob, R (18, 676, 150, 20));
     grid.setBounds (R (180, 572, 1080, 132));
+    pianoButton.setBounds (R (960, 547, 90, 20));
+    recButton.setBounds (R (1056, 547, 90, 20));
+    if (keyboard != nullptr)
+    {
+        const auto kb = R (180, 572, 1080, 132);
+        keyboard->setBounds (kb);
+        keyboard->setKeyWidth ((float) kb.getWidth() / 22.0f);     // 22 touches blanches de C2 a C5
+        keyboard->setLowestVisibleKey (36);
+    }
     beatLedArea = R (1160, 548, 96, 16);
 
     updateMenuVisibility();
@@ -1068,6 +1226,8 @@ void MonSyntheEditor::timerCallback()
 
     repaint (gfxA);
     repaint (gfxB);
+    if (currentMenu == mEq)
+        repaint (eqGraphArea);
     repaint (meterArea.expanded (S (4.0f)));
     repaint (ledsArea.expanded (S (4.0f)));
     repaint (seqPanel.withHeight (S (26.0f)));
@@ -1079,6 +1239,9 @@ void MonSyntheEditor::timerCallback()
 //==============================================================================
 void MonSyntheEditor::refreshPresetList (const juce::String& select)
 {
+    if (browser != nullptr && browser->isVisible())
+        browser->rebuild();
+
     presetBox.clear (juce::dontSendNotification);
 
     juce::StringArray cats;
@@ -1174,7 +1337,7 @@ void MonSyntheEditor::filesDropped (const juce::StringArray& files, int, int)
 {
     if (files.isEmpty())
         return;
-    loadWavetableFile (currentMenu == 1 ? 1 : 0, juce::File (files[0]));
+    loadWavetableFile (currentMenu == mOscB ? 1 : 0, juce::File (files[0]));
 }
 
 //==============================================================================
@@ -1289,26 +1452,25 @@ void MonSyntheEditor::paint (juce::Graphics& g)
     if (currentMenu == matrixMenu)
     {
         const auto both = screenAPanel.getUnion (screenBPanel);
-        drawPanel (g, both, "MATRICE DE MODULATION   //   SOURCE  x  QUANTITE  ->  CIBLE", Pal::role (menuAt (currentMenu).role));
+        drawPanel (g, both, "MATRICE 12 ROUTES   //   SOURCE  x  QUANTITE  ->  CIBLE   (quantite negative = inverse)", Pal::role (menuAt (currentMenu).role));
 
         g.setFont (Pal::mono (12.0f * scale, true));
         g.setColour (Pal::dim);
-        for (int i = 0; i < 6; ++i)
+        for (int i = 0; i < 12; ++i)
         {
-            const int y = matrixArea.getY() + S (26.0f) + i * S (60.0f) + S (15.0f);
-            g.drawText ("->", matrixArea.getX() + S (232.0f), y, S (32.0f), S (30.0f), juce::Justification::centred, false);
+            const int y = matrixArea.getY() + S (26.0f) + i * S (34.0f) + S (2.0f);
+            g.drawText ("->", matrixArea.getX() + S (222.0f), y, S (32.0f), S (28.0f), juce::Justification::centred, false);
             g.setColour (Pal::line);
-            g.drawHorizontalLine (matrixArea.getY() + S (26.0f) + (i + 1) * S (60.0f) - S (2.0f),
+            g.drawHorizontalLine (matrixArea.getY() + S (26.0f) + (i + 1) * S (34.0f) - S (2.0f),
                                   (float) matrixArea.getX(), (float) matrixArea.getRight());
             g.setColour (Pal::dim);
         }
-
-        g.setFont (Pal::mono (10.5f * scale));
-        g.setColour (Pal::dim);
-        g.drawFittedText ("Chaque ligne relie une SOURCE (LFO, enveloppe, velocite, macro...) a une CIBLE (cutoff, position, warp...).\n"
-                          "La quantite regle la force, et peut etre negative. Exemple : LFO -> CUTOFF = wobble ; MACRO 1 -> plusieurs cibles.",
-                          juce::Rectangle<int> (matrixArea.getX(), matrixArea.getY() + S (392.0f), matrixArea.getWidth(), S (40.0f)),
-                          juce::Justification::topLeft, 3);
+    }
+    else if (currentMenu == mEq)
+    {
+        drawPanel (g, screenAPanel.getUnion (screenBPanel), "EQ 8 BANDES   //   glisser un point : frequence + gain   -   molette : Q   -   double-clic : on/off",
+                   Pal::role (menuAt (currentMenu).role));
+        drawEq (g);
     }
     else
     {
@@ -1428,12 +1590,18 @@ void MonSyntheEditor::drawViz (juce::Graphics& g, int viz, juce::Rectangle<float
         case VizEnvFilter: drawEnvelopeViz (g, r, colour, "fltAttack", "fltDecay", "fltSustain", "fltRelease"); break;
         case VizEnvAmp:    drawEnvelopeViz (g, r, colour, "attack", "decay", "sustain", "release");            break;
         case VizEnvMod:    drawEnvelopeViz (g, r, colour, "modAttack", "modDecay", "modSustain", "modRelease"); break;
-        case VizLfo1:      drawLfoViz (g, r, colour, false);   break;
-        case VizLfo2:      drawLfoViz (g, r, colour, true);    break;
+        case VizLfo1:      drawLfoViz (g, r, colour, 0);       break;
+        case VizLfo2:      drawLfoViz (g, r, colour, 1);       break;
+        case VizLfo3:      drawLfoViz (g, r, colour, 2);       break;
+        case VizLfo4:      drawLfoViz (g, r, colour, 3);       break;
         case VizGlide:     drawGlideViz (g, r, colour);        break;
         case VizChorus:    drawChorusViz (g, r, colour);       break;
         case VizDelay:     drawDelayViz (g, r, colour);        break;
         case VizReverb:    drawReverbViz (g, r, colour);       break;
+        case VizNoise:     drawNoiseViz (g, r, colour);        break;
+        case VizPitch:     drawPitchViz (g, r, colour);        break;
+        case VizDisto:     drawDistoViz (g, r, colour);        break;
+        case VizComp:      drawCompViz (g, r, colour);         break;
         default:           break;                               // spectre : composant à part ; matrice : composants
     }
 }
@@ -1471,6 +1639,19 @@ void MonSyntheEditor::drawScopeViz (juce::Graphics& g, juce::Rectangle<float> r,
     g.strokePath (makePath (pos - 0.12f), juce::PathStrokeType (1.0f));
     g.strokePath (makePath (pos + 0.12f), juce::PathStrokeType (1.0f));
     glowStroke (g, makePath (pos), colour, 2.0f * scale);
+
+    if (forB && pv ("oscBLevel") < 0.01f && pv ("fmAmount") < 0.01f && pv ("ringAmount") < 0.01f)
+    {
+        g.setColour (Pal::bg.withAlpha (0.55f));
+        g.fillRect (r);
+        g.setColour (colour);
+        g.setFont (Pal::mono (12.5f * scale, true));
+        g.drawText ("OSC B SILENCIEUX", r, juce::Justification::centred, false);
+        g.setFont (Pal::mono (10.0f * scale));
+        g.setColour (Pal::dim);
+        g.drawText ("monte NIVEAU (ou FM / RING) pour l'entendre",
+                    r.withTrimmedTop (r.getHeight() * 0.58f), juce::Justification::centredTop, false);
+    }
 
     const auto names = WavetableBank::tableNames();
     g.setFont (Pal::mono (10.5f * scale, true));
@@ -1555,7 +1736,7 @@ void MonSyntheEditor::drawFilterViz (juce::Graphics& g, juce::Rectangle<float> r
     const float fc = pv ("cutoff");
     const float q = juce::jmax (0.3f, pv ("resonance"));
     const int type = (int) pv ("filterType");
-    static const char* typeNames[] = { "LP 12", "LP 24", "HP", "BP" };
+    static const char* typeNames[] = { "LP 12", "LP 24", "HP", "BP", "NOTCH", "COMB" };
 
     const auto area = r.reduced (4.0f * scale, 18.0f * scale);
     auto fx = [&] (float hz) { return area.getX() + area.getWidth() * std::log (hz / 20.0f) / std::log (1000.0f); };
@@ -1573,6 +1754,8 @@ void MonSyntheEditor::drawFilterViz (juce::Graphics& g, juce::Rectangle<float> r
             case 0:  return 1.0f / d;
             case 1:  return 1.0f / (d * d);
             case 2:  return x2 / d;
+            case 4:  return std::abs (1.0f - x2) / d;
+            case 5:  return 0.15f + 1.2f * std::abs (std::cos (juce::MathConstants<float>::pi * x)) * (0.4f + 0.12f * q);
             default: return (x / q) / d;
         }
     };
@@ -1655,12 +1838,13 @@ void MonSyntheEditor::drawEnvelopeViz (juce::Graphics& g, juce::Rectangle<float>
     label ("R " + fmtTime (tr), wa + wd + wh, total);
 }
 
-void MonSyntheEditor::drawLfoViz (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour colour, bool second)
+void MonSyntheEditor::drawLfoViz (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour colour, int which)
 {
-    const int shape = (int) pv (second ? "lfo2Shape" : "lfoShape");
-    const float rate = pv (second ? "lfo2Rate" : "lfoRate");
-    const int sync = (int) pv (second ? "lfo2Sync" : "lfoSync");
-    const float depth = second ? 1.0f : juce::jmax (0.12f, pv ("lfoDepth"));
+    const juce::String pre = which == 0 ? juce::String ("lfo") : "lfo" + juce::String (which + 1);
+    const int shape = (int) pv (pre + "Shape");
+    const float rate = pv (pre + "Rate");
+    const int sync = (int) pv (pre + "Sync");
+    const float depth = which != 0 ? 1.0f : juce::jmax (0.12f, pv ("lfoDepth"));
     const double bpm = proc.getHostBpm() > 1.0 ? proc.getHostBpm() : 120.0;
 
     const auto area = r.reduced (6.0f * scale, 20.0f * scale);
@@ -1693,7 +1877,7 @@ void MonSyntheEditor::drawLfoViz (juce::Graphics& g, juce::Rectangle<float> r, j
     const auto syncNames = MonSyntheProcessor::lfoSyncNames();
     g.setFont (Pal::mono (10.5f * scale, true));
     g.setColour (Pal::text);
-    g.drawText (juce::String (second ? "LFO 2   " : "LFO 1   ")
+    g.drawText ("LFO " + juce::String (which + 1) + "   "
                     + (sync > 0 ? syncNames[juce::jlimit (0, syncNames.size() - 1, sync)] : juce::String (rate, 2) + " Hz"),
                 r.removeFromTop (14.0f * scale), juce::Justification::centredLeft, false);
 }
@@ -1824,4 +2008,811 @@ void MonSyntheEditor::drawReverbViz (juce::Graphics& g, juce::Rectangle<float> r
     g.drawText ("REVERB   TAILLE " + juce::String (juce::roundToInt (size * 100.0f)) + "%   AMORTI "
                     + juce::String (juce::roundToInt (damp * 100.0f)) + "%   MIX " + juce::String (juce::roundToInt (mix * 100.0f)) + "%",
                 r.removeFromTop (14.0f * scale), juce::Justification::centredLeft, false);
+}
+
+//------------------------------------------------------------------------------
+void MonSyntheEditor::drawNoiseViz (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour colour)
+{
+    const float level = pv ("noiseLevel"), tone = pv ("noiseTone"), decay = pv ("noiseDecay");
+    const int type = (int) pv ("noiseType");
+    static const char* names[] = { "BLANC", "ROSE", "SALE" };
+
+    const auto area = r.reduced (6.0f * scale, 20.0f * scale);
+    g.setColour (Pal::line.brighter (0.3f).withAlpha (0.6f));
+    g.drawHorizontalLine ((int) area.getCentreY(), area.getX(), area.getRight());
+
+    // enveloppe de decay (fenêtre de 2 secondes)
+    juce::Path env;
+    const int n = 160;
+    for (int i = 0; i <= n; ++i)
+    {
+        const float t = 2.0f * (float) i / (float) n;
+        const float x = area.getX() + area.getWidth() * (float) i / (float) n;
+        const float y = area.getCentreY() - std::exp (-t / juce::jmax (0.005f, decay)) * level * area.getHeight() * 0.48f;
+        if (i == 0) env.startNewSubPath (x, y); else env.lineTo (x, y);
+    }
+    g.setColour (colour.withAlpha (0.5f));
+    g.strokePath (env, juce::PathStrokeType (1.2f * scale));
+
+    // bruit animé, lissé selon le ton
+    juce::Random rnd ((juce::int64) (nowSeconds() * 30.0));
+    const float k = 0.02f + 0.98f * tone * tone;
+    const float smooth = type == 1 ? 0.35f : 1.0f;
+    float lp = 0.0f, held = 0.0f;
+    int hold = 0;
+    juce::Path noise;
+    const int m = juce::jmax (64, (int) area.getWidth() / 2);
+    for (int i = 0; i <= m; ++i)
+    {
+        float w = rnd.nextFloat() * 2.0f - 1.0f;
+        if (type == 2) { if (hold <= 0) { held = w; hold = 1 + rnd.nextInt (10); } --hold; w = held; }
+        lp += (w - lp) * k * smooth;
+        const float t = 2.0f * (float) i / (float) m;
+        const float amp = juce::jmax (0.04f, level) * std::exp (-t / juce::jmax (0.005f, decay));
+        const float x = area.getX() + area.getWidth() * (float) i / (float) m;
+        const float y = area.getCentreY() - lp * amp * area.getHeight() * 0.48f;
+        if (i == 0) noise.startNewSubPath (x, y); else noise.lineTo (x, y);
+    }
+    glowStroke (g, noise, colour, 1.3f * scale);
+
+    g.setFont (Pal::mono (10.5f * scale, true));
+    g.setColour (Pal::text);
+    g.drawText ("BRUIT " + juce::String (names[juce::jlimit (0, 2, type)]) + "   NIVEAU " + juce::String (juce::roundToInt (level * 100.0f))
+                    + "%   DECAY " + (decay > 4.9f ? juce::String ("CONTINU") : fmtTime (decay)),
+                r.removeFromTop (14.0f * scale), juce::Justification::centredLeft, false);
+}
+
+void MonSyntheEditor::drawPitchViz (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour colour)
+{
+    const float amt = pv ("pitchEnvAmt"), decay = pv ("pitchEnvDecay");
+    const int mode = (int) pv ("phaseMode");
+    static const char* modes[] = { "PHASE ALEATOIRE", "PHASE FIXE", "PHASE LIBRE" };
+
+    const auto area = r.reduced (8.0f * scale, 22.0f * scale);
+    const float zeroY = area.getCentreY();
+    g.setColour (Pal::line.brighter (0.3f).withAlpha (0.7f));
+    g.drawHorizontalLine ((int) zeroY, area.getX(), area.getRight());
+
+    const float window = juce::jmax (0.3f, decay * 6.0f);
+    juce::Path p;
+    const int n = 160;
+    for (int i = 0; i <= n; ++i)
+    {
+        const float t = window * (float) i / (float) n;
+        const float v = amt * std::exp (-t / decay);
+        const float x = area.getX() + area.getWidth() * (float) i / (float) n;
+        const float y = zeroY - juce::jlimit (-60.0f, 60.0f, v) / 60.0f * area.getHeight() * 0.5f;
+        if (i == 0) p.startNewSubPath (x, y); else p.lineTo (x, y);
+    }
+    juce::Path fill (p);
+    fill.lineTo (area.getRight(), zeroY);
+    fill.lineTo (area.getX(), zeroY);
+    fill.closeSubPath();
+    g.setColour (colour.withAlpha (0.16f));
+    g.fillPath (fill);
+    glowStroke (g, p, colour, 2.0f * scale);
+
+    g.setFont (Pal::mono (10.5f * scale, true));
+    g.setColour (Pal::text);
+    g.drawText ("PITCH " + juce::String (amt >= 0.0f ? "+" : "") + juce::String (juce::roundToInt (amt)) + " st   DECAY "
+                    + fmtTime (decay) + "   " + modes[juce::jlimit (0, 2, mode)],
+                r.removeFromTop (14.0f * scale), juce::Justification::centredLeft, false);
+}
+
+void MonSyntheEditor::drawDistoViz (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour colour)
+{
+    const int type = (int) pv ("distType");
+    const float amt = pv ("distAmt"), mix = pv ("distMix");
+    static const char* names[] = { "SOFT", "HARD", "FOLD", "CRUSH", "ASYM" };
+
+    const auto area = r.reduced (10.0f * scale, 22.0f * scale);
+    const float cx = area.getCentreX(), cy = area.getCentreY();
+    const float hw = area.getWidth() * 0.5f, hh = area.getHeight() * 0.5f;
+
+    g.setColour (Pal::line.brighter (0.3f).withAlpha (0.7f));
+    g.drawHorizontalLine ((int) cy, area.getX(), area.getRight());
+    g.drawVerticalLine ((int) cx, area.getY(), area.getBottom());
+
+    juce::Path diag;
+    diag.startNewSubPath (cx - hw, cy + hh);
+    diag.lineTo (cx + hw, cy - hh);
+    g.setColour (colour.withAlpha (0.25f));
+    g.strokePath (diag, juce::PathStrokeType (1.0f));
+
+    juce::Path curve;
+    const int n = 240;
+    for (int i = 0; i <= n; ++i)
+    {
+        const float x = -1.0f + 2.0f * (float) i / (float) n;
+        const float wet = amt > 0.001f ? distShape (type, amt, x) : x;
+        const float y = x + mix * (wet - x);
+        const float px = cx + x * hw;
+        const float py = cy - juce::jlimit (-1.2f, 1.2f, y) * hh;
+        if (i == 0) curve.startNewSubPath (px, py); else curve.lineTo (px, py);
+    }
+    glowStroke (g, curve, colour, 2.0f * scale);
+
+    g.setFont (Pal::mono (10.5f * scale, true));
+    g.setColour (Pal::text);
+    g.drawText ("DISTO " + juce::String (names[juce::jlimit (0, 4, type)]) + "   QTE " + juce::String (juce::roundToInt (amt * 100.0f))
+                    + "%   MIX " + juce::String (juce::roundToInt (mix * 100.0f)) + "%",
+                r.removeFromTop (14.0f * scale), juce::Justification::centredLeft, false);
+}
+
+void MonSyntheEditor::drawCompViz (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour colour)
+{
+    const float thresh = pv ("compThresh"), ratio = pv ("compRatio"), makeup = pv ("compMakeup"), mix = pv ("compMix");
+    const float ceil = pv ("limCeil");
+    const bool on = thresh < -0.1f;
+
+    const auto area = r.reduced (10.0f * scale, 22.0f * scale);
+    // courbe entrée -> sortie, de -48 dB à 0 dB
+    auto X = [&] (float db) { return area.getX() + area.getWidth() * (db + 48.0f) / 48.0f; };
+    auto Y = [&] (float db) { return area.getBottom() - area.getHeight() * (juce::jlimit (-48.0f, 6.0f, db) + 48.0f) / 54.0f; };
+
+    g.setColour (Pal::line.brighter (0.4f).withAlpha (0.7f));
+    for (float db : { -36.0f, -24.0f, -12.0f, 0.0f })
+    {
+        g.drawVerticalLine ((int) X (db), area.getY(), area.getBottom());
+        g.drawHorizontalLine ((int) Y (db), area.getX(), area.getRight());
+    }
+
+    juce::Path diag;
+    diag.startNewSubPath (X (-48.0f), Y (-48.0f));
+    diag.lineTo (X (0.0f), Y (0.0f));
+    g.setColour (colour.withAlpha (0.25f));
+    g.strokePath (diag, juce::PathStrokeType (1.0f));
+
+    juce::Path curve;
+    for (int i = 0; i <= 96; ++i)
+    {
+        const float in = -48.0f + 48.0f * (float) i / 96.0f;
+        float out = in;
+        if (on && in > thresh)
+            out = thresh + (in - thresh) / juce::jmax (1.0f, ratio);
+        if (on)
+            out = in + mix * (out + makeup - in);
+        out = juce::jmin (out, ceil);                         // le limiteur coupe au plafond
+        if (i == 0) curve.startNewSubPath (X (in), Y (out)); else curve.lineTo (X (in), Y (out));
+    }
+    glowStroke (g, curve, colour, 2.0f * scale);
+
+    if (on)
+    {
+        g.setColour (colour.withAlpha (0.6f));
+        g.drawVerticalLine ((int) X (thresh), area.getY(), area.getBottom());
+    }
+
+    g.setFont (Pal::mono (10.5f * scale, true));
+    g.setColour (Pal::text);
+    g.drawText (on ? "COMP " + juce::String (juce::roundToInt (thresh)) + " dB   " + juce::String (ratio, 1) + ":1   LIM "
+                         + juce::String (ceil, 1) + " dB"
+                   : juce::String ("COMP OFF (seuil a 0)   LIM ") + juce::String (ceil, 1) + " dB",
+                r.removeFromTop (14.0f * scale), juce::Justification::centredLeft, false);
+}
+
+//==============================================================================
+// EQ 8 bandes
+//==============================================================================
+float MonSyntheEditor::paramPlain (const juce::String& id) const
+{
+    return proc.apvts.getRawParameterValue (id)->load();
+}
+
+void MonSyntheEditor::setParamPlain (const juce::String& id, float value)
+{
+    if (auto* p = proc.apvts.getParameter (id))
+        p->setValueNotifyingHost (p->convertTo0to1 (value));
+}
+
+void MonSyntheEditor::selectEqBand (int band)
+{
+    eqBand = juce::jlimit (0, 7, band);
+    const juce::String n = "eq" + juce::String (eqBand + 1);
+
+    for (size_t i = 0; i < 4; ++i)
+    {
+        fixedKnobs[i]->attachment.reset();
+        fixedKnobs[i]->paramId = {};
+    }
+
+    const char* labels[] = { "FREQ", "GAIN", "Q", "SORTIE" };
+    const juce::String ids[] = { n + "Freq", n + "Gain", n + "Q", "eqOut" };
+    for (size_t i = 0; i < 4; ++i)
+    {
+        fixedKnobs[i]->label.setText (labels[i], juce::dontSendNotification);
+        fixedKnobs[i]->attachment = std::make_unique<APVTS::SliderAttachment> (proc.apvts, ids[i], fixedKnobs[i]->slider);
+    }
+
+    eqOnAtt.reset();
+    eqTypeAtt.reset();
+    eqOnAtt = std::make_unique<APVTS::ButtonAttachment> (proc.apvts, n + "On", eqOnButton);
+    eqTypeAtt = std::make_unique<APVTS::ComboBoxAttachment> (proc.apvts, n + "Type", eqTypeBox);
+
+    for (int i = 0; i < 8; ++i)
+        eqBandButtons[(size_t) i].setToggleState (i == eqBand, juce::dontSendNotification);
+
+    repaint();
+}
+
+juce::Point<float> MonSyntheEditor::eqNodePos (int band) const
+{
+    const juce::String n = "eq" + juce::String (band + 1);
+    const auto area = eqGraphArea.toFloat().reduced (6.0f * scale);
+    const float freq = paramPlain (n + "Freq");
+    const int type = (int) paramPlain (n + "Type");
+    const float gain = (type == 0 || type == 4) ? 0.0f : paramPlain (n + "Gain");
+
+    const float x = area.getX() + area.getWidth() * std::log (freq / 20.0f) / std::log (1000.0f);
+    const float y = area.getCentreY() - gain / 15.0f * area.getHeight() * 0.5f;
+    return { x, y };
+}
+
+int MonSyntheEditor::eqHitTest (juce::Point<int> p) const
+{
+    int best = -1;
+    float bestDist = 18.0f * scale;
+    for (int b = 0; b < 8; ++b)
+    {
+        const float d = eqNodePos (b).getDistanceFrom (p.toFloat());
+        if (d < bestDist)
+        {
+            bestDist = d;
+            best = b;
+        }
+    }
+    return best;
+}
+
+void MonSyntheEditor::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu())
+    {
+        for (auto* k : fixedKnobs)
+            if (e.eventComponent == &k->slider)
+            {
+                showModMenu (*k);
+                return;
+            }
+    }
+
+    eqDragBand = -1;
+    if (currentMenu != mEq || ! eqGraphArea.contains (e.getPosition()))
+        return;
+
+    const int hit = eqHitTest (e.getPosition());
+    if (hit < 0)
+        return;
+
+    eqDragBand = hit;
+    selectEqBand (hit);
+    const juce::String n = "eq" + juce::String (hit + 1);
+    if (paramPlain (n + "On") < 0.5f)
+        setParamPlain (n + "On", 1.0f);          // un point attrapé s'active tout seul
+
+    for (const char* s : { "Freq", "Gain", "Q" })
+        if (auto* p = proc.apvts.getParameter (n + s))
+            p->beginChangeGesture();
+}
+
+void MonSyntheEditor::mouseDrag (const juce::MouseEvent& e)
+{
+    if (eqDragBand < 0)
+        return;
+
+    const juce::String n = "eq" + juce::String (eqDragBand + 1);
+    const auto area = eqGraphArea.toFloat().reduced (6.0f * scale);
+    const float fx = juce::jlimit (0.0f, 1.0f, ((float) e.x - area.getX()) / area.getWidth());
+    setParamPlain (n + "Freq", 20.0f * std::pow (1000.0f, fx));
+
+    const int type = (int) paramPlain (n + "Type");
+    const float ny = ((float) e.y - area.getCentreY()) / (area.getHeight() * 0.5f);      // -1 (haut) .. +1 (bas)
+    if (type == 0 || type == 4)
+        setParamPlain (n + "Q", juce::jlimit (0.1f, 10.0f, 0.71f * std::pow (10.0f, -ny)));   // coupe-bas/haut : la hauteur règle le Q
+    else
+        setParamPlain (n + "Gain", juce::jlimit (-15.0f, 15.0f, -ny * 15.0f));
+}
+
+void MonSyntheEditor::mouseUp (const juce::MouseEvent&)
+{
+    if (eqDragBand >= 0)
+    {
+        const juce::String n = "eq" + juce::String (eqDragBand + 1);
+        for (const char* s : { "Freq", "Gain", "Q" })
+            if (auto* p = proc.apvts.getParameter (n + s))
+                p->endChangeGesture();
+    }
+    eqDragBand = -1;
+}
+
+void MonSyntheEditor::mouseDoubleClick (const juce::MouseEvent& e)
+{
+    if (currentMenu != mEq || ! eqGraphArea.contains (e.getPosition()))
+        return;
+
+    const int hit = eqHitTest (e.getPosition());
+    if (hit >= 0)
+    {
+        const juce::String id = "eq" + juce::String (hit + 1) + "On";
+        setParamPlain (id, paramPlain (id) > 0.5f ? 0.0f : 1.0f);
+    }
+}
+
+void MonSyntheEditor::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
+{
+    if (currentMenu != mEq || ! eqGraphArea.contains (e.getPosition()))
+        return;
+
+    int hit = eqHitTest (e.getPosition());
+    if (hit < 0)
+        hit = eqBand;
+
+    const juce::String id = "eq" + juce::String (hit + 1) + "Q";
+    setParamPlain (id, juce::jlimit (0.1f, 10.0f, paramPlain (id) * std::exp (wheel.deltaY * 1.2f)));
+    selectEqBand (hit);
+}
+
+void MonSyntheEditor::drawEq (juce::Graphics& g)
+{
+    const auto gr = eqGraphArea.toFloat();
+    const auto area = gr.reduced (6.0f * scale);
+    const double sr = proc.getSampleRate() > 0.0 ? proc.getSampleRate() : 44100.0;
+
+    g.setColour (Pal::bg.darker (0.35f));
+    g.fillRect (gr);
+
+    auto fx = [&] (float hz) { return area.getX() + area.getWidth() * std::log (hz / 20.0f) / std::log (1000.0f); };
+    auto gy = [&] (float db) { return area.getCentreY() - db / 15.0f * area.getHeight() * 0.5f; };
+
+    // quadrillage : fréquences (20 Hz -> 20 kHz) et dB
+    g.setFont (Pal::mono (9.0f * scale));
+    for (float hz : { 20.0f, 30.0f, 40.0f, 50.0f, 60.0f, 70.0f, 80.0f, 90.0f, 100.0f, 200.0f, 300.0f, 400.0f, 500.0f, 600.0f, 700.0f,
+                      800.0f, 900.0f, 1000.0f, 2000.0f, 3000.0f, 4000.0f, 5000.0f, 6000.0f, 7000.0f, 8000.0f, 9000.0f, 10000.0f, 20000.0f })
+    {
+        const bool major = hz == 100.0f || hz == 1000.0f || hz == 10000.0f;
+        g.setColour (Pal::grid.withAlpha (major ? 0.75f : 0.35f));
+        g.drawVerticalLine ((int) fx (hz), area.getY(), area.getBottom());
+        if (major)
+        {
+            g.setColour (Pal::dim);
+            g.drawText (hz >= 1000.0f ? juce::String ((int) (hz / 1000.0f)) + "k" : juce::String ((int) hz),
+                        (int) fx (hz) + 2, (int) area.getBottom() - (int) (13.0f * scale), (int) (30.0f * scale), (int) (12.0f * scale),
+                        juce::Justification::centredLeft, false);
+        }
+    }
+    for (float db : { -12.0f, -6.0f, 0.0f, 6.0f, 12.0f })
+    {
+        g.setColour (Pal::grid.withAlpha (db == 0.0f ? 0.9f : 0.45f));
+        g.drawHorizontalLine ((int) gy (db), area.getX(), area.getRight());
+        g.setColour (Pal::dim);
+        g.drawText ((db > 0.0f ? "+" : "") + juce::String ((int) db), (int) area.getX() + 2, (int) gy (db) - (int) (12.0f * scale),
+                    (int) (28.0f * scale), (int) (12.0f * scale), juce::Justification::centredLeft, false);
+    }
+
+    g.setColour (Pal::cyan.withAlpha (0.4f));
+    g.drawRect (gr, 1.0f);
+
+    // courbe de chaque bande active (discrète) et courbe totale
+    std::array<juce::dsp::IIR::Coefficients<float>::Ptr, 8> coeffs;
+    std::array<bool, 8> on {};
+    for (int b = 0; b < 8; ++b)
+    {
+        const juce::String n = "eq" + juce::String (b + 1);
+        on[(size_t) b] = paramPlain (n + "On") > 0.5f;
+        coeffs[(size_t) b] = makeEqCoefficients ((int) paramPlain (n + "Type"), sr, paramPlain (n + "Freq"),
+                                                 paramPlain (n + "Gain"), paramPlain (n + "Q"));
+    }
+
+    const int n = 200;
+    juce::Path total;
+    for (int b = 0; b < 8; ++b)
+    {
+        if (! on[(size_t) b])
+            continue;
+        juce::Path one;
+        for (int i = 0; i <= n; ++i)
+        {
+            const float f = 20.0f * std::pow (1000.0f, (float) i / (float) n);
+            const float db = juce::jlimit (-24.0f, 24.0f, juce::Decibels::gainToDecibels ((float) coeffs[(size_t) b]->getMagnitudeForFrequency (f, sr), -60.0f));
+            const float x = area.getX() + area.getWidth() * (float) i / (float) n;
+            if (i == 0) one.startNewSubPath (x, gy (db)); else one.lineTo (x, gy (db));
+        }
+        g.setColour (Pal::role (b % 6).withAlpha (0.35f));
+        g.strokePath (one, juce::PathStrokeType (1.0f));
+    }
+
+    for (int i = 0; i <= n; ++i)
+    {
+        const float f = 20.0f * std::pow (1000.0f, (float) i / (float) n);
+        float mag = 1.0f;
+        for (int b = 0; b < 8; ++b)
+            if (on[(size_t) b])
+                mag *= (float) coeffs[(size_t) b]->getMagnitudeForFrequency (f, sr);
+        const float db = juce::jlimit (-24.0f, 24.0f, juce::Decibels::gainToDecibels (mag, -60.0f));
+        const float x = area.getX() + area.getWidth() * (float) i / (float) n;
+        if (i == 0) total.startNewSubPath (x, gy (db)); else total.lineTo (x, gy (db));
+    }
+
+    juce::Path fill (total);
+    fill.lineTo (area.getRight(), gy (0.0f));
+    fill.lineTo (area.getX(), gy (0.0f));
+    fill.closeSubPath();
+    g.setColour (Pal::cyan.withAlpha (0.12f));
+    g.fillPath (fill);
+    glowStroke (g, total, Pal::cyan, 2.0f * scale);
+
+    // points de contrôle
+    for (int b = 0; b < 8; ++b)
+    {
+        const auto p = eqNodePos (b);
+        const auto c = Pal::role (b % 6);
+        const float rad = 9.0f * scale;
+        if (b == eqBand)
+        {
+            g.setColour (c.withAlpha (0.3f));
+            g.fillEllipse (p.x - rad * 1.5f, p.y - rad * 1.5f, rad * 3.0f, rad * 3.0f);
+        }
+        g.setColour (on[(size_t) b] ? c : c.withAlpha (0.25f));
+        g.fillEllipse (p.x - rad, p.y - rad, rad * 2.0f, rad * 2.0f);
+        g.setColour (on[(size_t) b] ? Pal::bg : Pal::dim);
+        g.setFont (Pal::mono (10.0f * scale, true));
+        g.drawText (juce::String (b + 1), juce::Rectangle<float> (p.x - rad, p.y - rad, rad * 2.0f, rad * 2.0f),
+                    juce::Justification::centred, false);
+    }
+
+    // Aide pour la bande choisie
+    const juce::String nm = "eq" + juce::String (eqBand + 1);
+    const auto typeNames = juce::StringArray { "COUPE-BAS", "SHELF GRAVE", "CLOCHE", "SHELF AIGU", "COUPE-HAUT" };
+    g.setFont (Pal::mono (10.5f * scale, true));
+    g.setColour (Pal::text);
+    g.drawText ("BANDE " + juce::String (eqBand + 1) + "   " + typeNames[juce::jlimit (0, 4, (int) paramPlain (nm + "Type"))] + "   "
+                    + fmtHz (paramPlain (nm + "Freq")) + " Hz   " + juce::String (paramPlain (nm + "Gain"), 1) + " dB   Q "
+                    + juce::String (paramPlain (nm + "Q"), 2),
+                juce::Rectangle<float> (gr.getX() + 8.0f * scale, gr.getY() + 3.0f * scale, gr.getWidth() - 16.0f * scale, 14.0f * scale),
+                juce::Justification::centredLeft, false);
+}
+
+//==============================================================================
+// Modulation façon Serum : clic droit sur un potard -> choisir la source
+//==============================================================================
+int MonSyntheEditor::modTargetForParam (const juce::String& id)
+{
+    static const std::pair<const char*, int> map[] = {
+        { "position", 1 }, { "oscBPos", 2 }, { "cutoff", 3 }, { "resonance", 4 }, { "detune", 6 },
+        { "oscBLevel", 7 }, { "drive", 8 }, { "modAmount", 11 }, { "warpAmtA", 14 }, { "warpAmtB", 15 },
+        { "fmAmount", 16 }, { "ringAmount", 17 }, { "distAmt", 18 }, { "noiseLevel", 19 }, { "fltEnvAmount", 10 }
+    };
+    for (const auto& m : map)
+        if (id == m.first)
+            return m.second;
+    return 0;
+}
+
+void MonSyntheEditor::showModMenu (Knob& knob)
+{
+    const int target = modTargetForParam (knob.paramId);
+    juce::PopupMenu menu;
+
+    if (target == 0)
+    {
+        menu.addItem (1, "Ce reglage n'est pas modulable (utilise la MATRICE)", false, false);
+        menu.showMenuAsync (juce::PopupMenu::Options());
+        return;
+    }
+
+    const auto sources = MonSyntheProcessor::modSourceNames();
+    const auto targets = MonSyntheProcessor::modTargetNames();
+    menu.addSectionHeader ("MODULER  " + targets[target]);
+
+    // routes déjà présentes vers cette cible
+    std::array<int, 16> slotOf {};
+    slotOf.fill (-1);
+    for (int s = 1; s <= SynthVoice::numMixSlots; ++s)
+    {
+        const juce::String n = "mx" + juce::String (s);
+        const int src = (int) paramPlain (n + "Src");
+        if (src > 0 && src < 16 && (int) paramPlain (n + "Dst") == target && std::abs (paramPlain (n + "Amt")) > 0.001f)
+            slotOf[(size_t) src] = s;
+    }
+
+    for (int src = 1; src < sources.size(); ++src)
+        menu.addItem (100 + src, sources[src] + (slotOf[(size_t) src] > 0 ? "   (retirer)" : ""), true, slotOf[(size_t) src] > 0);
+
+    menu.addSeparator();
+    menu.addItem (1, "Retirer toutes les modulations de ce reglage");
+
+    juce::Component::SafePointer<MonSyntheEditor> safe (this);
+    menu.showMenuAsync (juce::PopupMenu::Options(), [safe, target, slotOf] (int result)
+    {
+        if (safe == nullptr || result == 0)
+            return;
+
+        auto* ed = safe.getComponent();
+        auto clear = [ed] (int s)
+        {
+            const juce::String n = "mx" + juce::String (s);
+            ed->setParamPlain (n + "Amt", 0.0f);
+            ed->setParamPlain (n + "Src", 0.0f);
+        };
+
+        if (result == 1)
+        {
+            for (int src = 1; src < 16; ++src)
+                if (slotOf[(size_t) src] > 0)
+                    clear (slotOf[(size_t) src]);
+        }
+        else
+        {
+            const int src = result - 100;
+            if (slotOf[(size_t) src] > 0)
+                clear (slotOf[(size_t) src]);
+            else
+                for (int s = 1; s <= SynthVoice::numMixSlots; ++s)           // première route libre
+                {
+                    const juce::String n = "mx" + juce::String (s);
+                    if ((int) ed->paramPlain (n + "Src") == 0 || std::abs (ed->paramPlain (n + "Amt")) < 0.001f)
+                    {
+                        ed->setParamPlain (n + "Src", (float) src);
+                        ed->setParamPlain (n + "Dst", (float) target);
+                        ed->setParamPlain (n + "Amt", 0.5f);
+                        break;
+                    }
+                }
+        }
+        ed->repaint();
+    });
+}
+
+// Anneaux de modulation : la zone colorée autour du potard montre l'amplitude de chaque route
+void MonSyntheEditor::paintOverChildren (juce::Graphics& g)
+{
+    if (currentMenu == matrixMenu || currentMenu == mEq)
+        return;
+
+    for (auto* k : fixedKnobs)
+    {
+        if (! k->slider.isVisible() || k->paramId.isEmpty())
+            continue;
+
+        const int target = modTargetForParam (k->paramId);
+        if (target == 0)
+            continue;
+
+        float total = 0.0f;
+        for (int s = 1; s <= SynthVoice::numMixSlots; ++s)
+        {
+            const juce::String n = "mx" + juce::String (s);
+            if ((int) paramPlain (n + "Src") > 0 && (int) paramPlain (n + "Dst") == target)
+                total += paramPlain (n + "Amt");
+        }
+
+        if (std::abs (total) < 0.001f)
+            continue;
+
+        auto& sl = k->slider;
+        auto sb = sl.getLookAndFeel().getSliderLayout (sl).sliderBounds.toFloat() + sl.getPosition().toFloat();
+        const float rad = juce::jmin (sb.getWidth(), sb.getHeight()) * 0.5f + 2.0f * scale;
+        const float a0 = juce::MathConstants<float>::pi * 1.2f, a1 = juce::MathConstants<float>::pi * 2.8f;
+        const float pos = (float) sl.valueToProportionOfLength (sl.getValue());
+        const float from = a0 + (a1 - a0) * pos;
+        const float to = a0 + (a1 - a0) * juce::jlimit (0.0f, 1.0f, pos + total * 0.5f);
+
+        juce::Path arc;
+        arc.addCentredArc (sb.getCentreX(), sb.getCentreY(), rad, rad, 0.0f, juce::jmin (from, to), juce::jmax (from, to), true);
+        g.setColour (Pal::role ((k->role + 2) % 6).withAlpha (0.9f));
+        g.strokePath (arc, juce::PathStrokeType (3.0f * scale));
+    }
+}
+
+void MonSyntheEditor::applyKeyboardColours()
+{
+    if (keyboard == nullptr)
+        return;
+
+    keyboard->setColour (juce::MidiKeyboardComponent::whiteNoteColourId, Pal::text.withMultipliedBrightness (0.85f));
+    keyboard->setColour (juce::MidiKeyboardComponent::blackNoteColourId, Pal::bg.darker (0.4f));
+    keyboard->setColour (juce::MidiKeyboardComponent::keySeparatorLineColourId, Pal::line);
+    keyboard->setColour (juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId, Pal::cyan.withAlpha (0.25f));
+    keyboard->setColour (juce::MidiKeyboardComponent::keyDownOverlayColourId, Pal::cyan.withAlpha (0.85f));
+    keyboard->setColour (juce::MidiKeyboardComponent::textLabelColourId, Pal::bg);
+    keyboard->setColour (juce::MidiKeyboardComponent::upDownButtonBackgroundColourId, Pal::panel);
+    keyboard->setColour (juce::MidiKeyboardComponent::upDownButtonArrowColourId, Pal::dim);
+    keyboard->setColour (juce::MidiKeyboardComponent::shadowColourId, Pal::bg);
+}
+
+//==============================================================================
+// Navigateur de presets
+//==============================================================================
+PresetBrowser::PresetBrowser (MonSyntheProcessor& p, std::function<void (int)> onPickPreset, std::function<void()> onClose)
+    : proc (p), onPick (std::move (onPickPreset))
+{
+    search.setMultiLine (false);
+    search.setTextToShowWhenEmpty ("rechercher un preset...", Pal::dim);
+    search.onTextChange = [this] { applyFilter(); };
+    addAndMakeVisible (search);
+
+    closeButton.onClick = std::move (onClose);
+    addAndMakeVisible (closeButton);
+
+    list.setRowHeight (28);
+    list.setColour (juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
+    addAndMakeVisible (list);
+
+    loadFavourites();
+    rebuild();
+}
+
+juce::File PresetBrowser::favouritesFile() const
+{
+    return MonSyntheProcessor::getPresetDirectory().getParentDirectory().getChildFile ("favourites.txt");
+}
+
+void PresetBrowser::loadFavourites()
+{
+    favs.clear();
+    const auto f = favouritesFile();
+    if (f.existsAsFile())
+        favs.addLines (f.loadFileAsString());
+    favs.removeEmptyStrings();
+}
+
+void PresetBrowser::saveFavourites() const
+{
+    const auto f = favouritesFile();
+    f.getParentDirectory().createDirectory();
+    f.replaceWithText (favs.joinIntoString ("\n"));
+}
+
+void PresetBrowser::rebuild()
+{
+    all.clear();
+    cats.clear();
+    cats.add ("TOUS");
+    cats.add ("FAVORIS");
+
+    const int nf = MonSyntheProcessor::getNumFactoryPresets();
+    for (int i = 0; i < nf; ++i)
+    {
+        const auto cat = MonSyntheProcessor::getFactoryPresetCategory (i);
+        all.push_back ({ MonSyntheProcessor::getFactoryPresetName (i), cat, 1000 + i });
+        cats.addIfNotAlreadyThere (cat);
+    }
+
+    const auto users = proc.getPresetNames();
+    for (int j = 0; j < users.size(); ++j)
+        all.push_back ({ users[j], "UTILISATEUR", 2000 + j });
+    if (users.size() > 0)
+        cats.add ("UTILISATEUR");
+
+    catButtons.clear();
+    for (const auto& c : cats)
+    {
+        auto b = std::make_unique<juce::TextButton> (c);
+        b->setClickingTogglesState (false);
+        b->setColour (juce::TextButton::buttonOnColourId, Pal::cyan);
+        b->setColour (juce::TextButton::textColourOffId, Pal::dim);
+        b->setColour (juce::TextButton::textColourOnId, Pal::text);
+        b->onClick = [this, c]
+        {
+            catFilter = c;
+            for (auto& other : catButtons)
+                other->setToggleState (other->getButtonText() == catFilter, juce::dontSendNotification);
+            applyFilter();
+        };
+        addAndMakeVisible (*b);
+        catButtons.push_back (std::move (b));
+    }
+
+    if (! cats.contains (catFilter))
+        catFilter = "TOUS";
+    for (auto& b : catButtons)
+        b->setToggleState (b->getButtonText() == catFilter, juce::dontSendNotification);
+
+    resized();
+    applyFilter();
+}
+
+void PresetBrowser::applyFilter()
+{
+    const auto needle = search.getText().trim().toLowerCase();
+    shown.clear();
+
+    for (const auto& e : all)
+    {
+        const bool catOk = catFilter == "TOUS" || (catFilter == "FAVORIS" ? favs.contains (e.name) : e.category == catFilter);
+        const bool textOk = needle.isEmpty() || e.name.toLowerCase().contains (needle) || e.category.toLowerCase().contains (needle);
+        if (catOk && textOk)
+            shown.push_back (e);
+    }
+
+    list.updateContent();
+    list.repaint();
+}
+
+void PresetBrowser::resized()
+{
+    auto r = getLocalBounds().reduced (10);
+    auto top = r.removeFromTop (28);
+    closeButton.setBounds (top.removeFromRight (90));
+    top.removeFromRight (8);
+    search.setBounds (top);
+    r.removeFromTop (8);
+
+    // boutons de categories sur plusieurs lignes
+    int x = r.getX(), y = r.getY();
+    const int h = 26, gap = 6;
+    for (auto& b : catButtons)
+    {
+        const int w = juce::jmax (70, b->getButtonText().length() * 9 + 20);
+        if (x + w > r.getRight())
+        {
+            x = r.getX();
+            y += h + gap;
+        }
+        b->setBounds (x, y, w, h);
+        x += w + gap;
+    }
+    r.removeFromTop (y + h + 10 - r.getY());
+    list.setBounds (r);
+}
+
+void PresetBrowser::paint (juce::Graphics& g)
+{
+    g.fillAll (Pal::panel);
+    g.setColour (Pal::cyan.withAlpha (0.5f));
+    g.drawRect (getLocalBounds().toFloat(), 1.0f);
+}
+
+void PresetBrowser::paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool selected)
+{
+    if (! juce::isPositiveAndBelow (row, (int) shown.size()))
+        return;
+
+    const auto& e = shown[(size_t) row];
+    if (selected || e.id == currentId)
+        g.fillAll (Pal::panelHi);
+    else if (row % 2 == 1)
+        g.fillAll (Pal::bg.withAlpha (0.25f));
+
+    g.setFont (Pal::mono (13.0f, e.id == currentId));
+    g.setColour (e.id == currentId ? Pal::cyan : Pal::text);
+    g.drawText (e.name, 12, 0, width / 2, height, juce::Justification::centredLeft, true);
+    g.setColour (Pal::dim);
+    g.drawText (e.category, width / 2, 0, width / 2 - 56, height, juce::Justification::centredLeft, true);
+
+    juce::Path star;
+    star.addStar ({ (float) width - 26.0f, (float) height * 0.5f }, 5, 4.5f, 9.0f);
+    if (favs.contains (e.name))
+    {
+        g.setColour (Pal::cyan);
+        g.fillPath (star);
+    }
+    else
+    {
+        g.setColour (Pal::dim.withAlpha (0.6f));
+        g.strokePath (star, juce::PathStrokeType (1.0f));
+    }
+}
+
+void PresetBrowser::listBoxItemClicked (int row, const juce::MouseEvent& e)
+{
+    if (! juce::isPositiveAndBelow (row, (int) shown.size()))
+        return;
+
+    const auto entry = shown[(size_t) row];
+    if (e.x > list.getWidth() - 50)
+    {
+        if (favs.contains (entry.name))
+            favs.removeString (entry.name);
+        else
+            favs.add (entry.name);
+        saveFavourites();
+        applyFilter();
+        return;
+    }
+
+    currentId = entry.id;
+    list.repaint();
+    if (onPick)
+        onPick (entry.id);
 }

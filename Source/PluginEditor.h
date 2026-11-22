@@ -168,6 +168,43 @@ private:
 };
 
 //==============================================================================
+// Navigateur de presets : categories, recherche, favoris
+class PresetBrowser : public juce::Component, private juce::ListBoxModel
+{
+public:
+    PresetBrowser (MonSyntheProcessor& p, std::function<void (int)> onPickPreset, std::function<void()> onClose);
+
+    void rebuild();                               // relit la banque d'usine et les presets utilisateur
+    void setSelectedId (int id) { currentId = id; list.repaint(); }
+
+    void paint (juce::Graphics&) override;
+    void resized() override;
+
+private:
+    struct Entry { juce::String name, category; int id; };
+
+    int getNumRows() override { return (int) shown.size(); }
+    void paintListBoxItem (int row, juce::Graphics&, int width, int height, bool selected) override;
+    void listBoxItemClicked (int row, const juce::MouseEvent&) override;
+
+    void applyFilter();
+    juce::File favouritesFile() const;
+    void loadFavourites();
+    void saveFavourites() const;
+
+    MonSyntheProcessor& proc;
+    std::function<void (int)> onPick;
+    juce::TextEditor search;
+    juce::ListBox list { "presets", this };
+    juce::TextButton closeButton { "FERMER" };
+    std::vector<std::unique_ptr<juce::TextButton>> catButtons;
+    std::vector<Entry> all, shown;
+    juce::StringArray cats, favs;
+    juce::String catFilter { "TOUS" };
+    int currentId = -1;
+};
+
+//==============================================================================
 // Analyseur de spectre de la sortie, en segments
 class SpectrumView : public juce::Component
 {
@@ -239,6 +276,16 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void paintOverChildren (juce::Graphics&) override;
+    void showModMenu (Knob& knob);
+    static int modTargetForParam (const juce::String& id);
+
+    // EQ : on attrape les points du graphique à la souris
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
 
     // Glisser un fichier .wav sur la fenêtre : OSC A (USER 1) ou OSC B (USER 2)
     bool isInterestedInFileDrag (const juce::StringArray& files) override;
@@ -254,11 +301,12 @@ private:
         std::unique_ptr<APVTS::SliderAttachment> attachment;   // détruit en premier
         int role = 0;
         bool linear = false;
+        juce::String paramId;      // paramètre actuellement relié (pour la modulation par clic droit)
     };
 
     enum Viz { VizNone = 0, VizScopeA, VizUnison, VizScopeB, VizFmRing, VizFilter,
-               VizEnvFilter, VizEnvAmp, VizEnvMod, VizLfo1, VizLfo2, VizGlide,
-               VizChorus, VizDelay, VizReverb, VizMatrix, VizSpectrum };
+               VizEnvFilter, VizEnvAmp, VizEnvMod, VizLfo1, VizLfo2, VizLfo3, VizLfo4, VizGlide,
+               VizChorus, VizDelay, VizReverb, VizMatrix, VizSpectrum, VizNoise, VizPitch, VizDisto, VizComp };
 
     struct ParamSlot { const char* id; const char* label; };
     struct MenuDef   { const char* name; int role; int vizA; int vizB; ParamSlot p[8]; };
@@ -269,7 +317,9 @@ private:
 
     // L'interface est dessinée pour 1280 x 720 puis mise à l'échelle (fenêtre redimensionnable, 16:9)
     static constexpr int baseWidth = 1280, baseHeight = 720;
-    static constexpr int numMenus = 14, matrixMenu = 13;
+    static constexpr int numMenus = 20, matrixMenu = 19;
+    enum MenuId { mOscA = 0, mOscB, mFmRing, mUnison, mNoise, mPitch, mFilter, mDisto, mEnvAmp, mEnvMod,
+                  mLfo, mLfo34, mJeu, mChorus, mPhaser, mDelay, mReverb, mEq, mMaster, mMatrix };
 
     static const MenuDef& menuAt (int index);
 
@@ -290,6 +340,8 @@ private:
     void importWavetable (int slot);
     void loadWavetableFile (int slot, const juce::File& file);
     void refreshPresetList (const juce::String& select = {});
+    std::unique_ptr<PresetBrowser> browser;
+    juce::TextButton browserButton { "PRESETS" };
     void stepPreset (int delta);
 
     // Dessin
@@ -304,11 +356,21 @@ private:
     void drawFilterViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
     void drawEnvelopeViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour,
                           const char* a, const char* d, const char* s, const char* rel);
-    void drawLfoViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour, bool second);
+    void drawLfoViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour, int which);
     void drawGlideViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
     void drawChorusViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
     void drawDelayViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
     void drawReverbViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
+    void drawNoiseViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
+    void drawPitchViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
+    void drawDistoViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
+    void drawCompViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
+    void drawEq (juce::Graphics&);
+    void selectEqBand (int band);
+    juce::Point<float> eqNodePos (int band) const;
+    int eqHitTest (juce::Point<int>) const;
+    void setParamPlain (const juce::String& id, float value);
+    float paramPlain (const juce::String& id) const;
     void timerCallback() override;
 
     MonSyntheProcessor& proc;
@@ -323,9 +385,10 @@ private:
     Knob* masterKnob = nullptr;
     Knob* gateKnob = nullptr;
     Knob* tempoKnob = nullptr;
-    std::array<Knob*, 6> mixAmt {};
+    std::array<Knob*, 12> mixAmt {};
 
-    NamedCombo tableA, tableB, warpA, warpB, filterType, lfoShape, lfoSync, lfo2Shape, lfo2Sync;
+    NamedCombo tableA, tableB, warpA, warpB, filterType, lfoShape, lfoSync, lfo2Shape, lfo2Sync, lfo3Shape, lfo3Sync, lfo4Shape, lfo4Sync, delaySync, delayMode,
+               noiseType, phaseMode, distType;
     juce::TextButton monoButton;
     std::unique_ptr<APVTS::ButtonAttachment> monoAttachment;
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> captions;
@@ -340,10 +403,15 @@ private:
     std::unique_ptr<APVTS::ButtonAttachment> seqButtonAttachment;
     std::unique_ptr<APVTS::ComboBoxAttachment> barsAttachment, rateAttachment;
     StepGrid grid;
+    juce::TextButton pianoButton { "PIANO" }, recButton { "REC" };
+    std::unique_ptr<APVTS::ButtonAttachment> recAttachment;
+    std::unique_ptr<juce::MidiKeyboardComponent> keyboard;
+    bool pianoMode = false;
+    void applyKeyboardColours();
 
     // Matrice de modulation (6 routes)
-    std::array<juce::ComboBox, 6> mixSrcBox, mixDstBox;
-    std::array<std::unique_ptr<APVTS::ComboBoxAttachment>, 6> mixSrcAtt, mixDstAtt;
+    std::array<juce::ComboBox, 12> mixSrcBox, mixDstBox;
+    std::array<std::unique_ptr<APVTS::ComboBoxAttachment>, 12> mixSrcAtt, mixDstAtt;
     juce::Label mixHdrSrc, mixHdrDst, mixHdrAmt;
     std::vector<juce::Component*> matrixComponents;
 
@@ -366,6 +434,16 @@ private:
     juce::Rectangle<int> menuPanel, screenAPanel, screenBPanel, gfxA, gfxB, macrosPanel, outPanel, seqPanel,
                          matrixArea, ledsArea, meterArea, beatLedArea, stripA, stripB, knobsA, knobsB;
     juce::Rectangle<int> scopeArea;                   // = zone graphique de l'écran A
+
+    // EQ 8 bandes
+    std::array<juce::TextButton, 8> eqBandButtons;
+    juce::TextButton eqOnButton { "BANDE ON" };
+    juce::ComboBox eqTypeBox;
+    std::unique_ptr<APVTS::ButtonAttachment> eqOnAtt;
+    std::unique_ptr<APVTS::ComboBoxAttachment> eqTypeAtt;
+    juce::Rectangle<int> eqGraphArea;
+    int eqBand = 2;
+    int eqDragBand = -1;
 
     // Mise à jour des couleurs
     std::vector<ComboRef> comboRefs;

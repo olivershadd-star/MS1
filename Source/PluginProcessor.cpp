@@ -379,6 +379,38 @@ void SynthVoice::prepare (double sampleRate, int blockSize)
     filter2.setResonance (0.7071f);
 }
 
+float SynthVoice::nextNoise (NoiseGen& n, int type, float tone)
+{
+    const float w = rng.nextFloat() * 2.0f - 1.0f;
+    float x = w;
+
+    if (type == 1)                       // rose (filtre de Paul Kellet)
+    {
+        n.b[0] = 0.99886f * n.b[0] + w * 0.0555179f;
+        n.b[1] = 0.99332f * n.b[1] + w * 0.0750759f;
+        n.b[2] = 0.96900f * n.b[2] + w * 0.1538520f;
+        n.b[3] = 0.86650f * n.b[3] + w * 0.3104856f;
+        n.b[4] = 0.55000f * n.b[4] + w * 0.5329522f;
+        n.b[5] = -0.7616f * n.b[5] - w * 0.0168980f;
+        x = (n.b[0] + n.b[1] + n.b[2] + n.b[3] + n.b[4] + n.b[5] + n.b[6] + w * 0.5362f) * 0.11f;
+        n.b[6] = w * 0.115926f;
+    }
+    else if (type == 2)                  // sale : valeurs tenues de longueur aléatoire (crépitement numérique)
+    {
+        if (n.hold <= 0)
+        {
+            n.held = w;
+            n.hold = 1 + rng.nextInt (12);
+        }
+        --n.hold;
+        x = n.held;
+    }
+
+    const float k = 0.02f + 0.98f * tone * tone;        // ton : 1 = brillant, 0 = sombre
+    n.lp += (x - n.lp) * k;
+    return n.lp;
+}
+
 void SynthVoice::startNote (int midiNote, float vel, juce::SynthesiserSound*, int pitchWheelPosition)
 {
     currentNote = targetNote = (double) midiNote;
@@ -387,16 +419,49 @@ void SynthVoice::startNote (int midiNote, float vel, juce::SynthesiserSound*, in
     noteRandom = rng.nextFloat() * 2.0f - 1.0f;
     keyDown = true;
 
-    phasesA[0] = 0.0;
-    phasesB[0] = 0.0;
-    for (size_t i = 1; i < phasesA.size(); ++i)
+    // Départ de phase : ALEATOIRE (son large), FIXE (toujours identique : kicks et basses précises), LIBRE (on ne touche à rien)
+    const int phaseMode = (int) param ("phaseMode");
+    const double phase0 = (double) param ("oscPhase");
+    if (phaseMode == 0)
     {
-        phasesA[i] = rng.nextDouble();       // phases aléatoires = son plus large
-        phasesB[i] = rng.nextDouble();
+        phasesA[0] = phase0;
+        phasesB[0] = phase0;
+        for (size_t i = 1; i < phasesA.size(); ++i)
+        {
+            phasesA[i] = rng.nextDouble();       // phases aléatoires = son plus large
+            phasesB[i] = rng.nextDouble();
+        }
+        phaseSub = 0.0;
     }
-    phaseSub = 0.0;
+    else if (phaseMode == 1)
+    {
+        for (size_t i = 0; i < phasesA.size(); ++i)
+            phasesA[i] = phasesB[i] = phase0;
+        phaseSub = phase0;
+    }
+
+    if (phaseMode != 2)                      // décalage de phase de B par rapport à A (présence, phasing)
+    {
+        const double offB = (double) param ("oscBPhase");
+        for (auto& p : phasesB)
+        {
+            p += offB;
+            p -= std::floor (p);
+        }
+    }
+
+    pitchEnvVal = 1.0f;
+    noiseEnvVal = 1.0f;
+    for (auto& n : noiseGen)
+        n = NoiseGen();
+    crushCount = 0;
     lfoPhase = 0.0;
     lfo2Phase = 0.0;
+    lfo3Phase = 0.0;
+    lfo4Phase = 0.0;
+    for (auto& b : combBuf)
+        b.fill (0.0f);
+    combPos = 0;
 
     position.setCurrentAndTargetValue (param ("position"));
     filter.reset();
@@ -461,6 +526,13 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     filter.setType (filterType == 2 ? FilterType::highpass
                                     : (filterType == 3 ? FilterType::bandpass : FilterType::lowpass));
     filter.setResonance (baseRes);
+    const bool notch = (filterType == 4);        // NOTCH = passe-bas + passe-haut en parallele
+    const bool comb  = (filterType == 5);        // COMB  = filtre en peigne accorde sur le cutoff
+    filter2.setType (notch ? FilterType::highpass : FilterType::lowpass);
+    if (notch)
+        filter2.setResonance (baseRes);
+    else
+        filter2.setResonance (0.7071f);
 
     // --- Vélocité
     const float velAmp    = param ("velAmp");
@@ -469,12 +541,24 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     const float ampVel    = (1.0f - velAmp) + velAmp * velocity;
     const float wheel     = modWheel.load();
 
-    // --- Matrice de modulation : sources 0..12, cibles 0..17
+    // --- Bruit, enveloppe de hauteur, distorsion
+    const float noiseLevel = param ("noiseLevel");
+    const int   noiseType  = (int) param ("noiseType");
+    const float noiseTone  = param ("noiseTone");
+    const float noiseCoef  = std::exp (-1.0f / (juce::jmax (0.002f, param ("noiseDecay")) * (float) sr));
+    const float pitchAmt   = param ("pitchEnvAmt");
+    const float pitchCoef  = std::exp (-1.0f / (juce::jmax (0.002f, param ("pitchEnvDecay")) * (float) sr));
+    const int   distType   = (int) param ("distType");
+    const float distAmt    = param ("distAmt");
+    const float distMix    = param ("distMix");
+
+    // --- Matrice de modulation : sources 0..15, cibles 0..20
     struct Slot { int src; int dst; float amt; };
     std::array<Slot, numMixSlots> slots {};
     int numSlots = 0;
     bool resonanceModulated = false;
     bool envTimeModulated = false;
+    bool pitchModulated = false;
 
     for (int s = 0; s < numMixSlots; ++s)
     {
@@ -489,6 +573,8 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
                 resonanceModulated = true;
             if (sl.dst == 12 || sl.dst == 13)
                 envTimeModulated = true;
+            if (sl.dst == 20)
+                pitchModulated = true;
         }
     }
 
@@ -512,6 +598,10 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     const double lfoInc    = lfoIncrement (param ("lfoRate"),  (int) param ("lfoSync"));
     const int    lfo2Shape = (int) param ("lfo2Shape");
     const double lfo2Inc   = lfoIncrement (param ("lfo2Rate"), (int) param ("lfo2Sync"));
+    const int    lfo3Shape = (int) param ("lfo3Shape");
+    const double lfo3Inc   = lfoIncrement (param ("lfo3Rate"), (int) param ("lfo3Sync"));
+    const int    lfo4Shape = (int) param ("lfo4Shape");
+    const double lfo4Inc   = lfoIncrement (param ("lfo4Rate"), (int) param ("lfo4Sync"));
     const std::array<float, 4> macros { param ("macro1"), param ("macro2"), param ("macro3"), param ("macro4") };
 
     // --- Tables
@@ -533,13 +623,18 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         offsets[(size_t) u] = offset;
 
         const float angle = (offset * spread + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
-        gainL[(size_t) u] = std::cos (angle) * juce::MathConstants<float>::sqrt2 * norm;
-        gainR[(size_t) u] = std::sin (angle) * juce::MathConstants<float>::sqrt2 * norm;
+        const float side = std::abs (offset) < 0.001f ? 1.0f : uniBlend;      // blend : niveau des voix laterales
+        gainL[(size_t) u] = std::cos (angle) * juce::MathConstants<float>::sqrt2 * norm * side;
+        gainR[(size_t) u] = std::sin (angle) * juce::MathConstants<float>::sqrt2 * norm * side;
     }
 
     // --- Oscillateur B et sub
+    const float  levelA  = param ("oscALevel");
+    const float  voiceGain = juce::Decibels::decibelsToGain (param ("voiceGain"));
     const float  levelB  = param ("oscBLevel");
     const float  posB    = param ("oscBPos");
+    const double factorA = std::pow (2.0, std::round ((double) param ("oscAOct")) + (double) param ("oscATune") / 1200.0);
+    const float  uniBlend = param ("uniBlend");
     const double factorB = std::pow (2.0, std::round ((double) param ("oscBOct")) + (double) param ("oscBTune") / 1200.0);
     const float  subAmt  = param ("subLevel");
 
@@ -569,8 +664,9 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         keyNorm = juce::jlimit (-1.0f, 1.0f, (float) ((currentNote - 60.0) / 36.0));
 
         const double note  = currentNote + (double) (bendNorm * bendRange) + (double) modPitch;
-        const double freq  = 440.0 * std::pow (2.0, (note - 69.0) / 12.0);
-        const double freqB = freq * factorB;
+        const double freqBase = 440.0 * std::pow (2.0, (note - 69.0) / 12.0);
+        const double freq  = freqBase * factorA;
+        const double freqB = freqBase * factorB;
 
         for (int u = 0; u < uni; ++u)
         {
@@ -579,12 +675,14 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
             incA[k] = freq / sr * ratio;
             incB[k] = freqB / sr * ratio;
         }
-        incSub = freq / sr * 0.5;                              // sub : une octave en dessous
+        incSub = freqBase / sr * 0.5;                              // sub : une octave en dessous
 
         const double maxRatio = std::pow (2.0, (double) detuneNow / 1200.0);
         mipA = WavetableBank::levelForFrequency (freq * maxRatio);
         mipB = WavetableBank::levelForFrequency (freqB * maxRatio);
     };
+
+    const int pitchStep = (std::abs (pitchAmt) > 0.01f || pitchModulated) ? 8 : 32;     // mise à jour plus fine pour une chute de hauteur rapide
 
     for (int i = 0; i < numSamples; ++i)
     {
@@ -599,27 +697,39 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         if (lfo2Phase >= 1.0)
             lfo2Phase -= 1.0;
 
+        const float lfo3 = lfoValue (lfo3Shape, lfo3Phase);
+        lfo3Phase += lfo3Inc;
+        if (lfo3Phase >= 1.0)
+            lfo3Phase -= 1.0;
+
+        const float lfo4 = lfoValue (lfo4Shape, lfo4Phase);
+        lfo4Phase += lfo4Inc;
+        if (lfo4Phase >= 1.0)
+            lfo4Phase -= 1.0;
+
         const float mEnv = modEnv.getNextSample();
         const float fEnv = fltEnv.getNextSample();
 
-        std::array<float, 13> src {};
+        std::array<float, 16> src {};
         src[1] = lfo;  src[2] = mEnv;  src[3] = fEnv;  src[4] = velocity;
         src[5] = keyNorm;  src[6] = wheel;  src[7] = noteRandom;
         src[8] = lfo2;
         src[9] = macros[0];  src[10] = macros[1];  src[11] = macros[2];  src[12] = macros[3];
+        src[13] = pitchEnvVal;
+        src[14] = lfo3;  src[15] = lfo4;
 
-        std::array<float, 18> tgt {};
+        std::array<float, 21> tgt {};
         for (int s = 0; s < numSlots; ++s)
         {
             const auto& sl = slots[(size_t) s];
             tgt[(size_t) sl.dst] += sl.amt * src[(size_t) sl.src];
         }
 
-        if ((i & 31) == 0)
+        if ((i % pitchStep) == 0)
         {
-            modPitch  = tgt[5] * 12.0f;
+            modPitch  = tgt[5] * 12.0f + (pitchAmt + tgt[20] * 48.0f) * pitchEnvVal;
             detuneNow = juce::jlimit (0.0f, 100.0f, detune + tgt[6] * 50.0f);
-            updatePitch (32);
+            updatePitch (pitchStep);
 
             if (envTimeModulated)       // un LFO ou une macro peut faire varier la durée des enveloppes
             {
@@ -627,6 +737,10 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
                 fltEnv.setParameters ({ fltA, juce::jlimit (0.001f, 20.0f, fltD * std::exp2 (tgt[13] * 3.0f)), fltS, fltR });
             }
         }
+
+        pitchEnvVal *= pitchCoef;
+        const float noiseEnvNow = noiseEnvVal;
+        noiseEnvVal *= noiseCoef;
 
         // Position dans la wavetable = réglage de base + LFO + enveloppe de modulation + matrice
         const float posA = position.getNextValue() + lfoDepth * lfo + (modAmount + tgt[11]) * mEnv + tgt[1];
@@ -658,7 +772,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
 
             const float sA = bank.getSample (tabA, posA, mipA, warpPhase (warpModeA, warpA, phaseA));
 
-            float s = sA + levelBNow * sB;
+            float s = levelA * sA + levelBNow * sB;
             if (ring > 0.001f)
                 s += ring * (sA * sB * 1.4f - s);
 
@@ -682,6 +796,15 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         if (phaseSub >= 1.0)
             phaseSub -= 1.0;
 
+        // Bruit (avec sa propre enveloppe de decay)
+        const float nLevel = juce::jlimit (0.0f, 1.0f, noiseLevel + tgt[19]);
+        if (nLevel > 0.001f)
+        {
+            const float nAmp = nLevel * noiseEnvNow * 0.5f;
+            l += nextNoise (noiseGen[0], noiseType, noiseTone) * nAmp;
+            r += nextNoise (noiseGen[1], noiseType, noiseTone) * nAmp;
+        }
+
         // Saturation avant le filtre
         const float driveNow = juce::jlimit (0.0f, 1.0f, drive + tgt[8]);
         if (driveNow > 0.001f)
@@ -696,22 +819,85 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         const float octaves = (fltAmount + tgt[10]) * fEnv * 5.0f + tgt[3] * 5.0f + velTerm;
         const float cutoff = juce::jlimit (20.0f, 20000.0f, baseCutoff * std::exp2 (octaves));
         filter.setCutoffFrequency (cutoff);
-        if (twoPole)
+        if (twoPole || notch)
             filter2.setCutoffFrequency (cutoff);
         if (resonanceModulated)
-            filter.setResonance (juce::jlimit (0.5f, 10.0f, baseRes + tgt[4] * 4.0f));
+        {
+            const float resNow = juce::jlimit (0.5f, 10.0f, baseRes + tgt[4] * 4.0f);
+            filter.setResonance (resNow);
+            if (notch)
+                filter2.setResonance (resNow);
+        }
 
-        l = filter.processSample (0, l);
-        r = filter.processSample (1, r);
+        if (comb)
+        {
+            // y[n] = x[n] + g * y[n - d], d = periode du cutoff (interpolation lineaire)
+            const float resNow = juce::jlimit (0.5f, 10.0f, baseRes + (resonanceModulated ? tgt[4] * 4.0f : 0.0f));
+            const float fb = juce::jlimit (0.0f, 0.93f, 0.25f + (resNow - 0.5f) * 0.07f);
+            const float d = juce::jlimit (2.0f, 4090.0f, (float) sr / juce::jmax (40.0f, cutoff));
+            const int di = (int) d;
+            const float fr = d - (float) di;
+            const float outGain = 1.0f - 0.5f * fb;
+            float* in[2] = { &l, &r };
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                auto& buf = combBuf[(size_t) ch];
+                const int p1 = (combPos - di + 4096) & 4095;
+                const int p2 = (combPos - di - 1 + 4096) & 4095;
+                const float delayed = buf[(size_t) p1] * (1.0f - fr) + buf[(size_t) p2] * fr;
+                const float y = *in[ch] + fb * delayed;
+                buf[(size_t) combPos] = y;
+                *in[ch] = y * outGain;
+            }
+            combPos = (combPos + 1) & 4095;
+        }
+        else if (notch)
+        {
+            const float l0 = l, r0 = r;
+            l = filter.processSample (0, l0) + filter2.processSample (0, l0);
+            r = filter.processSample (1, r0) + filter2.processSample (1, r0);
+        }
+        else
+        {
+            l = filter.processSample (0, l);
+            r = filter.processSample (1, r);
+        }
+
         if (twoPole)
         {
             l = filter2.processSample (0, l);
             r = filter2.processSample (1, r);
         }
 
+        // Distorsion (après le filtre)
+        const float dAmt = juce::jlimit (0.0f, 1.0f, distAmt + tgt[18]);
+        if (dAmt > 0.001f)
+        {
+            float wl, wr;
+            if (distType == 3)
+            {
+                if (crushCount <= 0)
+                {
+                    crushHeld[0] = l;
+                    crushHeld[1] = r;
+                    crushCount = 1 + (int) (dAmt * dAmt * 24.0f);
+                }
+                --crushCount;
+                wl = distShape (3, dAmt, crushHeld[0]);
+                wr = distShape (3, dAmt, crushHeld[1]);
+            }
+            else
+            {
+                wl = distShape (distType, dAmt, l);
+                wr = distShape (distType, dAmt, r);
+            }
+            l += distMix * (wl - l);
+            r += distMix * (wr - r);
+        }
+
         // Volume
         const float ampMod = juce::jlimit (0.0f, 2.0f, 1.0f + tgt[9]);
-        const float env = adsr.getNextSample() * ampVel * ampMod * 0.25f;
+        const float env = adsr.getNextSample() * ampVel * ampMod * 0.45f * voiceGain;     // +5 dB par rapport à avant : les sons seuls (kicks, hats) étaient trop bas
         l *= env;
         r *= env;
 
@@ -828,13 +1014,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     // Oscillateur A
     addChoice ("tableA", "Table A", WavetableBank::tableNames(), 0);
     addFloat  ("position", "Wavetable", unit, 0.3f);
+    addFloat  ("oscALevel", "A Niveau", unit, 1.0f);
 
     // Oscillateur B + sub
     addChoice ("tableB",   "Table B", WavetableBank::tableNames(), 0);
     addFloat ("oscBPos",   "B Wavetable", unit, 0.5f);
+    addInt   ("oscAOct",   "A Octave", -2, 2, 0);
+    addFloat ("oscATune",  "A Accord (cents)", NormalisableRange<float> (-100.0f, 100.0f), 0.0f);
+    addFloat ("uniBlend",  "Unison Blend", unit, 1.0f);
     addInt   ("oscBOct",   "B Octave", -2, 2, 0);
     addFloat ("oscBTune",  "B Accord (cents)", NormalisableRange<float> (-100.0f, 100.0f), 0.0f);
     addFloat ("oscBLevel", "B Niveau", unit, 0.0f);
+    addFloat ("oscBPhase", "B Phase", unit, 0.0f);
     addFloat ("subLevel",  "Sub Niveau", unit, 0.0f);
 
     // Warp, FM et ring : de quoi travailler le son bien plus loin
@@ -851,7 +1042,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addFloat ("spread", "Stereo", unit, 0.6f);
 
     // Filtre
-    addChoice ("filterType", "Filtre Type", StringArray { "LP 12", "LP 24", "HP", "BP" }, 0);
+    addChoice ("filterType", "Filtre Type", StringArray { "LP 12", "LP 24", "HP", "BP", "NOTCH", "COMB" }, 0);
     addFloat  ("cutoff",    "Cutoff", NormalisableRange<float> (20.0f, 20000.0f, 0.0f, 0.3f), 2000.0f);
     addFloat  ("resonance", "Resonance", NormalisableRange<float> (0.5f, 10.0f, 0.0f, 0.5f), 0.7f);
     addFloat  ("drive",     "Drive", unit, 0.0f);
@@ -877,6 +1068,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addChoice ("lfo2Shape", "LFO2 Forme", StringArray { "Sinus", "Triangle", "Saw", "Carre" }, 0);
     addFloat  ("lfo2Rate",  "LFO2 Vitesse (Hz)", NormalisableRange<float> (0.05f, 20.0f, 0.0f, 0.4f), 0.5f);
     addChoice ("lfo2Sync",  "LFO2 Sync", lfoSyncNames(), 0);
+    addChoice ("lfo3Shape", "LFO3 Forme", StringArray { "Sinus", "Triangle", "Saw", "Carre" }, 1);
+    addFloat  ("lfo3Rate",  "LFO3 Vitesse (Hz)", NormalisableRange<float> (0.05f, 20.0f, 0.0f, 0.4f), 2.0f);
+    addChoice ("lfo3Sync",  "LFO3 Sync", lfoSyncNames(), 0);
+    addChoice ("lfo4Shape", "LFO4 Forme", StringArray { "Sinus", "Triangle", "Saw", "Carre" }, 2);
+    addFloat  ("lfo4Rate",  "LFO4 Vitesse (Hz)", NormalisableRange<float> (0.05f, 20.0f, 0.0f, 0.4f), 0.25f);
+    addChoice ("lfo4Sync",  "LFO4 Sync", lfoSyncNames(), 0);
     addFloat  ("macro1", "Macro 1", unit, 0.0f);
     addFloat  ("macro2", "Macro 2", unit, 0.0f);
     addFloat  ("macro3", "Macro 3", unit, 0.0f);
@@ -889,11 +1086,55 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addFloat ("modRelease", "Mod Release", time, 0.3f);
     addFloat ("modAmount",  "Mod Quantite", NormalisableRange<float> (-1.0f, 1.0f), 0.5f);
 
+    // EQ 8 bandes : pour chaque bande, on / type / fréquence / gain / Q
+    {
+        static const int   eqTypes[8] = { 0, 1, 2, 2, 2, 2, 3, 4 };
+        static const float eqFreqs[8] = { 40.0f, 100.0f, 300.0f, 800.0f, 2000.0f, 5000.0f, 9000.0f, 18000.0f };
+        for (int b = 1; b <= 8; ++b)
+        {
+            const String n = "eq" + String (b);
+            addBool   ((n + "On").toRawUTF8(), ("EQ " + String (b) + " On").toRawUTF8(), false);
+            addChoice ((n + "Type").toRawUTF8(), ("EQ " + String (b) + " Type").toRawUTF8(),
+                       StringArray { "COUPE-BAS", "SHELF GRAVE", "CLOCHE", "SHELF AIGU", "COUPE-HAUT" }, eqTypes[b - 1]);
+            addFloat  ((n + "Freq").toRawUTF8(), ("EQ " + String (b) + " Freq").toRawUTF8(),
+                       NormalisableRange<float> (20.0f, 20000.0f, 0.0f, 0.3f), eqFreqs[b - 1]);
+            addFloat  ((n + "Gain").toRawUTF8(), ("EQ " + String (b) + " Gain").toRawUTF8(),
+                       NormalisableRange<float> (-15.0f, 15.0f), 0.0f);
+            addFloat  ((n + "Q").toRawUTF8(), ("EQ " + String (b) + " Q").toRawUTF8(),
+                       NormalisableRange<float> (0.1f, 10.0f, 0.0f, 0.4f), 0.71f);
+        }
+        addFloat ("eqOut", "EQ Sortie (dB)", NormalisableRange<float> (-12.0f, 12.0f), 0.0f);
+    }
+
+    // Gain de voix et page MASTER (compresseur, limiteur, largeur)
+    addFloat ("voiceGain", "Gain de voix (dB)", NormalisableRange<float> (-12.0f, 12.0f), 0.0f);
+    addFloat ("compThresh",  "Comp Seuil (dB)", NormalisableRange<float> (-40.0f, 0.0f), 0.0f);
+    addFloat ("compRatio",   "Comp Ratio", NormalisableRange<float> (1.0f, 20.0f, 0.0f, 0.5f), 3.0f);
+    addFloat ("compAttack",  "Comp Attaque (ms)", NormalisableRange<float> (1.0f, 100.0f, 0.0f, 0.5f), 10.0f);
+    addFloat ("compRelease", "Comp Release (ms)", NormalisableRange<float> (20.0f, 500.0f, 0.0f, 0.5f), 120.0f);
+    addFloat ("compMakeup",  "Comp Makeup (dB)", NormalisableRange<float> (0.0f, 24.0f), 0.0f);
+    addFloat ("compMix",     "Comp Mix", unit, 1.0f);
+    addFloat ("limCeil",     "Limiteur Plafond (dB)", NormalisableRange<float> (-12.0f, 0.0f), -1.0f);
+    addFloat ("width",       "Largeur stereo", NormalisableRange<float> (0.0f, 2.0f), 1.0f);
+
     // Vélocité
     addFloat ("velAmp",    "Velocite Volume", unit, 1.0f);
     addFloat ("velFilter", "Velocite Filtre", unit, 0.0f);
 
-    // Matrice de modulation : 6 routes (source -> cible, quantité)
+    // Bruit, hauteur (kicks), départ de phase, distorsion
+    addFloat  ("noiseLevel", "Bruit Niveau", unit, 0.0f);
+    addChoice ("noiseType",  "Bruit Type", StringArray { "BLANC", "ROSE", "SALE" }, 0);
+    addFloat  ("noiseTone",  "Bruit Ton", unit, 1.0f);
+    addFloat  ("noiseDecay", "Bruit Decay", NormalisableRange<float> (0.005f, 5.0f, 0.0f, 0.35f), 5.0f);
+    addFloat  ("pitchEnvAmt",   "Pitch Env Quantite (demi-tons)", NormalisableRange<float> (-60.0f, 60.0f), 0.0f);
+    addFloat  ("pitchEnvDecay", "Pitch Env Decay", NormalisableRange<float> (0.003f, 2.0f, 0.0f, 0.4f), 0.08f);
+    addChoice ("phaseMode",  "Phase Mode", StringArray { "ALEATOIRE", "FIXE", "LIBRE" }, 0);
+    addFloat  ("oscPhase",   "Phase Depart", unit, 0.0f);
+    addChoice ("distType",   "Disto Type", StringArray { "SOFT", "HARD", "FOLD", "CRUSH", "ASYM" }, 0);
+    addFloat  ("distAmt",    "Disto Quantite", unit, 0.0f);
+    addFloat  ("distMix",    "Disto Mix", unit, 1.0f);
+
+    // Matrice de modulation : 12 routes (source -> cible, quantité)
     for (int i = 1; i <= SynthVoice::numMixSlots; ++i)
     {
         const String n = "mx" + String (i);
@@ -920,12 +1161,28 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addFloat ("delayFeedback", "Delay Feedback", NormalisableRange<float> (0.0f, 0.9f), 0.35f);
     addFloat ("delayMix",      "Delay Mix", unit, 0.0f);
 
+    addFloat ("chorusDelay",    "Chorus Delai (ms)", NormalisableRange<float> (1.0f, 30.0f, 0.0f, 0.5f), 7.0f);
+    addFloat ("chorusFeedback", "Chorus Feedback", NormalisableRange<float> (-0.95f, 0.95f), 0.0f);
+    addChoice ("delaySync", "Delay Sync", StringArray { "LIBRE", "1/4", "1/8", "1/8 PT", "1/16", "1/16 T", "1/2" }, 0);
+    addChoice ("delayMode", "Delay Mode", StringArray { "STEREO", "PING-PONG" }, 0);
+    addFloat ("delayLP", "Delay Filtre Aigu", NormalisableRange<float> (200.0f, 20000.0f, 0.0f, 0.3f), 20000.0f);
+    addFloat ("delayHP", "Delay Filtre Grave", NormalisableRange<float> (20.0f, 2000.0f, 0.0f, 0.4f), 20.0f);
+    addFloat ("reverbPre", "Reverb Pre-delay (ms)", NormalisableRange<float> (0.0f, 200.0f), 0.0f);
+    addFloat ("reverbLP", "Reverb Filtre Aigu", NormalisableRange<float> (500.0f, 20000.0f, 0.0f, 0.3f), 20000.0f);
+    addFloat ("reverbHP", "Reverb Filtre Grave", NormalisableRange<float> (20.0f, 2000.0f, 0.0f, 0.4f), 20.0f);
+    addFloat ("reverbWidth", "Reverb Largeur", unit, 1.0f);
+    addFloat ("phaserMix",   "Phaser Mix", unit, 0.0f);
+    addFloat ("phaserRate",  "Phaser Vitesse", NormalisableRange<float> (0.05f, 8.0f, 0.0f, 0.4f), 0.5f);
+    addFloat ("phaserDepth", "Phaser Profondeur", unit, 0.6f);
+    addFloat ("phaserFeedback", "Phaser Feedback", NormalisableRange<float> (-0.9f, 0.9f), 0.3f);
+    addFloat ("phaserCentre", "Phaser Centre (Hz)", NormalisableRange<float> (100.0f, 6000.0f, 0.0f, 0.4f), 1200.0f);
     addFloat ("reverbSize", "Reverb Taille", unit, 0.5f);
     addFloat ("reverbDamp", "Reverb Amorti", unit, 0.5f);
     addFloat ("reverbMix",  "Reverb Mix", unit, 0.0f);
 
     // Séquenceur
     addBool   ("seqOn", "Sequenceur", false);
+    addBool   ("seqRec", "Seq Enregistrement", false);
     addChoice ("seqBars", "Seq Longueur", StringArray { "1 mesure", "2 mesures", "3 mesures", "4 mesures" }, 0);
     addChoice ("seqRate", "Seq Vitesse", StringArray { "1/8", "1/16", "1/32" }, 1);
     addFloat  ("seqGate",  "Seq Gate", NormalisableRange<float> (0.05f, 1.0f), 0.5f);
@@ -946,6 +1203,17 @@ MonSyntheProcessor::MonSyntheProcessor()
         if (themeFile.existsAsFile())
             themeHue = juce::jlimit (0.0f, 1.0f, themeFile.loadFileAsString().trim().getFloatValue());
     }
+
+    for (int b = 0; b < 8; ++b)
+    {
+        const juce::String n = "eq" + juce::String (b + 1);
+        eqParams[(size_t) (b * 5)]     = apvts.getRawParameterValue (n + "On");
+        eqParams[(size_t) (b * 5 + 1)] = apvts.getRawParameterValue (n + "Type");
+        eqParams[(size_t) (b * 5 + 2)] = apvts.getRawParameterValue (n + "Freq");
+        eqParams[(size_t) (b * 5 + 3)] = apvts.getRawParameterValue (n + "Gain");
+        eqParams[(size_t) (b * 5 + 4)] = apvts.getRawParameterValue (n + "Q");
+    }
+    eqOutParam = apvts.getRawParameterValue ("eqOut");
 
     synth.addSound (new SynthSound());
     for (int i = 0; i < 8; ++i)               // 8 voix de polyphonie
@@ -971,6 +1239,28 @@ void MonSyntheProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
     reverb.setSampleRate (sampleRate);
     reverb.reset();
+
+    phaser.prepare (spec);
+    phaser.setMix (0.5f);
+    preDelay.setMaximumDelayInSamples ((int) (sampleRate * 0.25) + 8);
+    preDelay.prepare (spec);
+    preDelay.reset();
+    reverbBuf.setSize (2, juce::jmax (samplesPerBlock, 8192));
+    for (int i = 0; i < 2; ++i)
+        dlLp[i] = dlHp[i] = rvLp[i] = rvHp[i] = 0.0f;
+
+    for (auto& band : eqBands)
+    {
+        band.f[0].reset();
+        band.f[1].reset();
+        band.lastType = -1;
+    }
+    lastEqOut = 1.0f;
+
+    compressor.prepare (spec);
+    limiter.prepare (spec);
+    limiter.setRelease (60.0f);
+    dryBuffer.setSize (2, juce::jmax (samplesPerBlock, 8192));
 
     lastMaster = param ("master");
 
@@ -1012,6 +1302,7 @@ void MonSyntheProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     hostPpq = ppqNow;
 
     synth.setMono (param ("mono") > 0.5f);
+    keyboardState.processNextMidiBuffer (midi, 0, numSamples, true);
     generateSequencerMidi (midi, numSamples);
     synth.renderNextBlock (buffer, midi, 0, numSamples);
 
@@ -1059,12 +1350,14 @@ void MonSyntheProcessor::applyEffects (juce::AudioBuffer<float>& buffer)
     const int numCh = juce::jmin (2, buffer.getNumChannels());
     const double sr = getSampleRate();
 
-    // Chorus
+    // Chorus / flanger (delai court + feedback)
     const float chorusMix = param ("chorusMix");
     if (chorusMix > 0.001f && numCh == 2)
     {
         chorus.setRate (param ("chorusRate"));
         chorus.setDepth (param ("chorusDepth"));
+        chorus.setCentreDelay (param ("chorusDelay"));
+        chorus.setFeedback (param ("chorusFeedback"));
         chorus.setMix (chorusMix);
 
         juce::dsp::AudioBlock<float> block (buffer);
@@ -1072,52 +1365,236 @@ void MonSyntheProcessor::applyEffects (juce::AudioBuffer<float>& buffer)
         chorus.process (context);
     }
 
-    // Delay stéréo (le canal droit est un peu plus long)
+    // Phaser
+    const float phaserMix = param ("phaserMix");
+    if (phaserMix > 0.001f && numCh == 2)
+    {
+        phaser.setRate (param ("phaserRate"));
+        phaser.setDepth (param ("phaserDepth"));
+        phaser.setCentreFrequency (param ("phaserCentre"));
+        phaser.setFeedback (param ("phaserFeedback"));
+        phaser.setMix (phaserMix);
+
+        juce::dsp::AudioBlock<float> block (buffer);
+        juce::dsp::ProcessContextReplacing<float> context (block);
+        phaser.process (context);
+    }
+
+    // Delay : libre ou synchronise, stereo ou ping-pong, filtres dans le feedback
     const float delayMix = param ("delayMix");
     if (delayMix > 0.001f)
     {
         const float feedback = param ("delayFeedback");
-        const float timeL = (float) (param ("delayTime") * 0.001 * sr);
-        const float timeR = timeL * 1.08f;
+        const int syncIdx = (int) param ("delaySync");
+        const bool ping = (int) param ("delayMode") == 1 && numCh == 2;
+        static const float beats[] = { 0.0f, 1.0f, 0.5f, 0.75f, 0.25f, 1.0f / 6.0f, 2.0f };
 
-        for (int ch = 0; ch < numCh; ++ch)
+        float timeL = (float) (param ("delayTime") * 0.001 * sr);
+        if (syncIdx > 0)
+            timeL = (float) (beats[juce::jlimit (0, 6, syncIdx)] * 60.0 / juce::jmax (20.0, getHostBpm()) * sr);
+        timeL = juce::jlimit (8.0f, (float) (sr * 1.28), timeL);
+        const float timeR = ping || syncIdx > 0 ? timeL : juce::jmin ((float) (sr * 1.28), timeL * 1.08f);
+
+        const float lpA = 1.0f - std::exp (-juce::MathConstants<float>::twoPi * param ("delayLP") / (float) sr);
+        const float hpA = 1.0f - std::exp (-juce::MathConstants<float>::twoPi * param ("delayHP") / (float) sr);
+
+        auto fbFilter = [&] (int ch, float v)
         {
-            auto* x = buffer.getWritePointer (ch);
-            const float time = ch == 0 ? timeL : timeR;
+            dlLp[ch] += lpA * (v - dlLp[ch]);
+            dlHp[ch] += hpA * (dlLp[ch] - dlHp[ch]);
+            return dlLp[ch] - dlHp[ch];
+        };
 
+        if (numCh == 2)
+        {
+            auto* xl = buffer.getWritePointer (0);
+            auto* xr = buffer.getWritePointer (1);
+            for (int i = 0; i < numSamples; ++i)
+            {
+                const float inL = xl[i], inR = xr[i];
+                const float dL = delayLine.popSample (0, timeL, true);
+                const float dR = delayLine.popSample (1, timeR, true);
+                const float fL = fbFilter (0, dL) * feedback;
+                const float fR = fbFilter (1, dR) * feedback;
+
+                if (ping)
+                {
+                    delayLine.pushSample (0, (inL + inR) * 0.5f + fR);
+                    delayLine.pushSample (1, fL);
+                }
+                else
+                {
+                    delayLine.pushSample (0, inL + fL);
+                    delayLine.pushSample (1, inR + fR);
+                }
+
+                xl[i] = inL + dL * delayMix;
+                xr[i] = inR + dR * delayMix;
+            }
+        }
+        else
+        {
+            auto* x = buffer.getWritePointer (0);
             for (int i = 0; i < numSamples; ++i)
             {
                 const float in = x[i];
-                const float d = delayLine.popSample (ch, time, true);
-                delayLine.pushSample (ch, in + d * feedback);
+                const float d = delayLine.popSample (0, timeL, true);
+                delayLine.pushSample (0, in + fbFilter (0, d) * feedback);
                 x[i] = in + d * delayMix;
             }
         }
     }
 
-    // Reverb
+    // Reverb : pre-delay, filtres sur le signal reverbere, largeur
     const float reverbMix = param ("reverbMix");
-    if (reverbMix > 0.001f)
+    if (reverbMix > 0.001f && numCh == 2 && numSamples <= reverbBuf.getNumSamples())
     {
         juce::Reverb::Parameters rp;
         rp.roomSize   = param ("reverbSize");
         rp.damping    = param ("reverbDamp");
-        rp.wetLevel   = 0.33f * reverbMix;
-        rp.dryLevel   = 0.5f * (1.0f - 0.4f * reverbMix);
+        rp.wetLevel   = 0.33f;
+        rp.dryLevel   = 0.0f;
         rp.width      = 1.0f;
         rp.freezeMode = 0.0f;
         reverb.setParameters (rp);
 
-        if (buffer.getNumChannels() >= 2)
-            reverb.processStereo (buffer.getWritePointer (0), buffer.getWritePointer (1), numSamples);
-        else
-            reverb.processMono (buffer.getWritePointer (0), numSamples);
+        const float preSamples = juce::jlimit (0.0f, (float) (sr * 0.24), (float) (param ("reverbPre") * 0.001 * sr));
+        const float rLpA = 1.0f - std::exp (-juce::MathConstants<float>::twoPi * param ("reverbLP") / (float) sr);
+        const float rHpA = 1.0f - std::exp (-juce::MathConstants<float>::twoPi * param ("reverbHP") / (float) sr);
+        const float width = param ("reverbWidth");
+
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            const float* src = buffer.getReadPointer (ch);
+            float* dst = reverbBuf.getWritePointer (ch);
+            for (int i = 0; i < numSamples; ++i)
+            {
+                preDelay.pushSample (ch, src[i]);
+                dst[i] = preDelay.popSample (ch, preSamples, true);
+            }
+        }
+
+        reverb.processStereo (reverbBuf.getWritePointer (0), reverbBuf.getWritePointer (1), numSamples);
+
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            float* wet = reverbBuf.getWritePointer (ch);
+            for (int i = 0; i < numSamples; ++i)
+            {
+                rvLp[ch] += rLpA * (wet[i] - rvLp[ch]);
+                rvHp[ch] += rHpA * (rvLp[ch] - rvHp[ch]);
+                wet[i] = rvLp[ch] - rvHp[ch];
+            }
+        }
+
+        auto* wl = reverbBuf.getWritePointer (0);
+        auto* wr = reverbBuf.getWritePointer (1);
+        auto* xl = buffer.getWritePointer (0);
+        auto* xr = buffer.getWritePointer (1);
+        const float dryGain = 1.0f - 0.4f * reverbMix;
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const float mid = 0.5f * (wl[i] + wr[i]), side = 0.5f * (wl[i] - wr[i]) * width;
+            xl[i] = xl[i] * dryGain + (mid + side) * reverbMix;
+            xr[i] = xr[i] * dryGain + (mid - side) * reverbMix;
+        }
+    }
+
+    // EQ 8 bandes (chaque bande active filtre les deux canaux)
+    {
+        const double eqRate = sr > 0.0 ? sr : 44100.0;
+        const float eqOutGain = juce::Decibels::decibelsToGain (eqOutParam->load());
+        bool any = false;
+
+        for (size_t b = 0; b < 8; ++b)
+        {
+            if (eqParams[b * 5]->load() < 0.5f)
+                continue;
+
+            any = true;
+            auto& band = eqBands[b];
+            const int   type = (int) eqParams[b * 5 + 1]->load();
+            const float freq = eqParams[b * 5 + 2]->load();
+            const float gain = eqParams[b * 5 + 3]->load();
+            const float q    = eqParams[b * 5 + 4]->load();
+
+            if (type != band.lastType || freq != band.lastFreq || gain != band.lastGain || q != band.lastQ)
+            {
+                const auto coeffs = makeEqCoefficients (type, eqRate, freq, gain, q);
+                band.f[0].coefficients = coeffs;
+                band.f[1].coefficients = coeffs;
+                band.lastType = type;  band.lastFreq = freq;  band.lastGain = gain;  band.lastQ = q;
+            }
+
+            for (int ch = 0; ch < numCh; ++ch)
+            {
+                auto* x = buffer.getWritePointer (ch);
+                for (int i = 0; i < numSamples; ++i)
+                    x[i] = band.f[(size_t) ch].processSample (x[i]);
+            }
+        }
+
+        if (any || std::abs (eqOutGain - 1.0f) > 0.001f || std::abs (lastEqOut - 1.0f) > 0.001f)
+            buffer.applyGainRamp (0, numSamples, lastEqOut, eqOutGain);
+        lastEqOut = eqOutGain;
+    }
+
+    // MASTER : compresseur (mix parallèle), largeur stéréo
+    const float compThresh = param ("compThresh");
+    if (compThresh < -0.1f && numCh == 2)
+    {
+        const float mix = param ("compMix");
+        if (dryBuffer.getNumSamples() < numSamples)
+            dryBuffer.setSize (2, numSamples, false, false, true);
+        for (int ch = 0; ch < 2; ++ch)
+            dryBuffer.copyFrom (ch, 0, buffer, ch, 0, numSamples);
+
+        compressor.setThreshold (compThresh);
+        compressor.setRatio (param ("compRatio"));
+        compressor.setAttack (param ("compAttack"));
+        compressor.setRelease (param ("compRelease"));
+
+        juce::dsp::AudioBlock<float> block (buffer);
+        juce::dsp::ProcessContextReplacing<float> context (block);
+        compressor.process (context);
+
+        const float makeup = juce::Decibels::decibelsToGain (param ("compMakeup"));
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            auto* wet = buffer.getWritePointer (ch);
+            const auto* dry = dryBuffer.getReadPointer (ch);
+            for (int i = 0; i < numSamples; ++i)
+                wet[i] = dry[i] * (1.0f - mix) + wet[i] * makeup * mix;
+        }
+    }
+
+    const float width = param ("width");
+    if (numCh == 2 && std::abs (width - 1.0f) > 0.01f)
+    {
+        auto* l = buffer.getWritePointer (0);
+        auto* r = buffer.getWritePointer (1);
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const float mid = 0.5f * (l[i] + r[i]);
+            const float side = 0.5f * (l[i] - r[i]) * width;
+            l[i] = mid + side;
+            r[i] = mid - side;
+        }
     }
 
     // Volume général (avec rampe pour éviter les clics)
     const float master = param ("master");
     buffer.applyGainRamp (0, numSamples, lastMaster, master);
     lastMaster = master;
+
+    // Limiteur de sortie : protège contre les saturations, surtout avec les presets plus forts
+    if (numCh == 2)
+    {
+        limiter.setThreshold (param ("limCeil"));
+        juce::dsp::AudioBlock<float> block (buffer);
+        juce::dsp::ProcessContextReplacing<float> context (block);
+        limiter.process (context);
+    }
 }
 
 //==============================================================================
@@ -1160,6 +1637,27 @@ void MonSyntheProcessor::generateSequencerMidi (juce::MidiBuffer& midi, int numS
     const double samplesPerBeat = 60.0 / juce::jmax (1.0, bpm) * getSampleRate();
     const double gate = param ("seqGate");
     const auto gateSamples = (juce::int64) juce::jmax (1.0, gate * stepBeats * samplesPerBeat);
+
+    // REC : les notes jouees (clavier a l'ecran ou MIDI) sont quantifiees sur le pas le plus proche
+    if (param ("seqRec") > 0.5f)
+    {
+        bool changed = false;
+        for (const auto meta : midi)
+        {
+            const auto msg = meta.getMessage();
+            if (! msg.isNoteOn())
+                continue;
+
+            const double ppq = ppqStart + (double) meta.samplePosition / samplesPerBeat;
+            const juce::int64 k = (juce::int64) std::llround (ppq / stepBeats);
+            const int recStep = (int) (((k % totalSteps) + totalSteps) % totalSteps);
+            sequencer.on[(size_t) recStep] = true;
+            sequencer.note[(size_t) recStep] = msg.getNoteNumber();
+            changed = true;
+        }
+        if (changed)
+            ++sequencer.revision;
+    }
 
     const double ppqEnd = ppqStart + (double) numSamples / samplesPerBeat;
     constexpr double eps = 1.0e-6;
@@ -1420,7 +1918,7 @@ bool MonSyntheProcessor::deletePreset (const juce::String& name)
 //==============================================================================
 juce::StringArray MonSyntheProcessor::warpModeNames()
 {
-    return { "OFF", "BEND+", "BEND-", "SYNC", "MIRROR" };
+    return { "OFF", "BEND+", "BEND-", "SYNC", "MIRROR", "ASYM", "FLIP", "QUANT", "PWM", "WOBBLE" };
 }
 
 juce::StringArray MonSyntheProcessor::lfoSyncNames()
@@ -1431,13 +1929,17 @@ juce::StringArray MonSyntheProcessor::lfoSyncNames()
 juce::StringArray MonSyntheProcessor::modSourceNames()
 {
     return { "---", "LFO", "ENV MOD", "ENV FILTRE", "VELOCITE", "NOTE", "MOLETTE", "ALEA",
-             "LFO 2", "MACRO 1", "MACRO 2", "MACRO 3", "MACRO 4" };
+             "LFO 2", "MACRO 1", "MACRO 2", "MACRO 3", "MACRO 4", "ENV PITCH", "LFO 3", "LFO 4" };
 }
 
 juce::StringArray MonSyntheProcessor::modTargetNames()
 {
-    return { "---", "POSITION A", "POSITION B", "CUTOFF", "RESO", "HAUTEUR", "DESACCORD", "NIVEAU B", "DRIVE", "VOLUME",
-             "QTE ENV FILTRE", "QTE ENV MOD", "DECAY VOL", "DECAY FILTRE", "WARP A", "WARP B", "FM", "RING" };
+    // Les noms sont regroupes par module (les numeros internes ne changent pas : les presets restent valides)
+    return { "---", "OSC A  POSITION", "OSC B  POSITION", "FILTRE  CUTOFF", "FILTRE  RESO", "PITCH  HAUTEUR",
+             "UNISON  DESACCORD", "OSC B  NIVEAU", "FILTRE  DRIVE", "AMP  VOLUME",
+             "ENV  QTE ENV FILTRE", "ENV  QTE ENV MOD", "ENV  DECAY VOLUME", "ENV  DECAY FILTRE",
+             "OSC A  WARP", "OSC B  WARP", "FM/RING  FM", "FM/RING  RING",
+             "DISTO  QUANTITE", "BRUIT  NIVEAU", "PITCH  QTE ENV PITCH" };
 }
 
 //==============================================================================

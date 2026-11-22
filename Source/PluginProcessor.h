@@ -3,7 +3,8 @@
 #include <juce_dsp/juce_dsp.h>
 #include <array>
 
-// Déformation de la phase d'un oscillateur ("warp") : 0 OFF, 1 BEND+, 2 BEND-, 3 SYNC, 4 MIRROR
+// Déformation de la phase d'un oscillateur ("warp") :
+// 0 OFF, 1 BEND+, 2 BEND-, 3 SYNC, 4 MIRROR, 5 ASYM, 6 FLIP, 7 QUANT, 8 PWM, 9 WOBBLE
 inline double warpPhase (int mode, float amount, double p) noexcept
 {
     if (mode <= 0 || amount <= 0.0001f)
@@ -29,12 +30,79 @@ inline double warpPhase (int mode, float amount, double p) noexcept
             const double t = p * (1.0 + 7.0 * w);
             return t - std::floor (t);
         }
-        default:                                 // MIRROR : le cycle est replié en miroir
+        case 4:                                  // MIRROR : le cycle est replié en miroir
         {
             const double t = p * (1.0 + 3.0 * w);
             const double f = t - std::floor (t);
             return 1.0 - std::abs (2.0 * f - 1.0);
         }
+        case 5:                                  // ASYM : la première moitié s'étire, la seconde se comprime
+        {
+            const double b = 0.5 + 0.45 * w;
+            return p < 0.5 ? p * 2.0 * b : b + (p - 0.5) * 2.0 * (1.0 - b);
+        }
+        case 6:                                  // FLIP : la fin du cycle est lue à l'envers
+        {
+            const double t = 1.0 - 0.5 * w;
+            return p < t ? p : 2.0 * t - p;
+        }
+        case 7:                                  // QUANT : la phase est quantifiée en marches (son crunchy)
+        {
+            const double n = 2.0 + 126.0 * (1.0 - w) * (1.0 - w);
+            return std::floor (p * n) / n;
+        }
+        case 8:                                  // PWM : le point milieu du cycle se déplace (largeur d'impulsion)
+        {
+            const double d = 0.5 - 0.45 * w;
+            return p < d ? p * 0.5 / d : 0.5 + (p - d) * 0.5 / (1.0 - d);
+        }
+        case 9:                                  // WOBBLE : la phase ondule (effet vocal / métallique)
+        {
+            const double t = p + 0.08 * w * std::sin (p * 4.0 * juce::MathConstants<double>::pi);
+            return t - std::floor (t);
+        }
+        default:
+            return p;
+    }
+}
+
+// Distorsion : 0 SOFT, 1 HARD, 2 FOLD, 3 CRUSH, 4 ASYM. amt : 0..1
+inline float distShape (int type, float amt, float x) noexcept
+{
+    const float g = std::exp2 (amt * 5.0f);                       // gain de 1 à 32
+    switch (type)
+    {
+        case 0:  return std::tanh (g * x) * 0.9f;                                         // saturation douce
+        case 1:  return juce::jlimit (-1.0f, 1.0f, g * x) * 0.8f;                         // écrêtage dur
+        case 2:  return std::sin (g * x * 1.5707963f) * 0.9f;                             // repli d'onde
+        case 3:                                                                           // bitcrusher (la réduction de fréquence est faite par la voix)
+        {
+            const float levels = std::exp2 (14.0f - amt * 12.0f);
+            return std::round (x * levels) / levels;
+        }
+        default:                                                                          // asymétrique : harmoniques paires
+        {
+            const float b = 0.6f * amt;
+            return (std::tanh (g * x + b) - std::tanh (b)) * 0.9f;
+        }
+    }
+}
+
+// Coefficients d'une bande d'EQ : 0 COUPE-BAS, 1 SHELF GRAVE, 2 CLOCHE, 3 SHELF AIGU, 4 COUPE-HAUT
+inline juce::dsp::IIR::Coefficients<float>::Ptr makeEqCoefficients (int type, double sampleRate, float freq, float gainDb, float q)
+{
+    using C = juce::dsp::IIR::Coefficients<float>;
+    const double f = juce::jlimit (20.0, sampleRate * 0.45, (double) freq);
+    const float qq = juce::jlimit (0.1f, 10.0f, q);
+    const float g = juce::Decibels::decibelsToGain (gainDb);
+
+    switch (type)
+    {
+        case 0:  return C::makeHighPass (sampleRate, f, qq);
+        case 1:  return C::makeLowShelf (sampleRate, f, qq, g);
+        case 3:  return C::makeHighShelf (sampleRate, f, qq, g);
+        case 4:  return C::makeLowPass (sampleRate, f, qq);
+        default: return C::makePeakFilter (sampleRate, f, qq, g);
     }
 }
 
@@ -115,7 +183,7 @@ class SynthVoice : public juce::SynthesiserVoice
 {
 public:
     static constexpr int maxUnison = 7;
-    static constexpr int numMixSlots = 6;
+    static constexpr int numMixSlots = 12;
 
     SynthVoice (juce::AudioProcessorValueTreeState& state, const WavetableBank& wavetables,
                 std::atomic<float>& modWheelRef, std::atomic<double>& bpmRef);
@@ -157,7 +225,21 @@ private:
     double phaseSub = 0.0;
     double lfoPhase = 0.0;
     double lfo2Phase = 0.0;
+    double lfo3Phase = 0.0;
+    std::array<std::array<float, 4096>, 2> combBuf {};      // filtre en peigne (COMB)
+    int combPos = 0;
+    double lfo4Phase = 0.0;
     juce::Random rng;
+
+    // Bruit, enveloppe de hauteur, distorsion
+    struct NoiseGen { float b[7] {}; float lp = 0.0f; float held = 0.0f; int hold = 0; };
+    std::array<NoiseGen, 2> noiseGen;
+    float pitchEnvVal = 1.0f;       // 1 -> 0 (décroissance exponentielle depuis le début de la note)
+    float noiseEnvVal = 1.0f;
+    std::array<float, 2> crushHeld {};
+    int crushCount = 0;
+
+    float nextNoise (NoiseGen& n, int type, float tone);
 
     double currentNote = 60.0;     // note actuelle (peut glisser vers targetNote)
     double targetNote = 60.0;
@@ -228,6 +310,7 @@ public:
 
     // Séquenceur
     StepSequencerData sequencer;
+    juce::MidiKeyboardState keyboardState;     // clavier a l'ecran : notes jouees a la souris, et MIDI recu (touches allumees)
     std::atomic<int> currentStep { -1 };
 
     // Wavetables importées depuis un fichier audio (emplacements USER 1 et USER 2)
@@ -276,7 +359,27 @@ private:
     juce::dsp::Chorus<float> chorus;
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine;
     juce::Reverb reverb;
+    juce::dsp::Phaser<float> phaser;
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> preDelay { 48000 };
+    juce::AudioBuffer<float> reverbBuf;
+    float dlLp[2] = { 0.0f, 0.0f }, dlHp[2] = { 0.0f, 0.0f };      // filtres du feedback de delay
+    float rvLp[2] = { 0.0f, 0.0f }, rvHp[2] = { 0.0f, 0.0f };      // filtres de la reverb
+    juce::dsp::Compressor<float> compressor;     // page MASTER
+    juce::dsp::Limiter<float> limiter;
+    juce::AudioBuffer<float> dryBuffer;          // copie du signal pour le mix parallèle du compresseur
     float lastMaster = 1.0f;
+
+    // EQ 8 bandes (page EQ)
+    struct EqBand
+    {
+        std::array<juce::dsp::IIR::Filter<float>, 2> f;
+        float lastFreq = -1.0f, lastGain = -99.0f, lastQ = -1.0f;
+        int lastType = -1;
+    };
+    std::array<EqBand, 8> eqBands;
+    std::array<std::atomic<float>*, 40> eqParams {};      // par bande : on, type, freq, gain, Q
+    std::atomic<float>* eqOutParam = nullptr;
+    float lastEqOut = 1.0f;
 
     juce::String userTableNames[WavetableBank::numUserTables];
     juce::String userTablePaths[WavetableBank::numUserTables];
