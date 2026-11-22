@@ -441,10 +441,12 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     if (! isVoiceActive())
         return;
 
-    // --- Enveloppes
-    adsr.setParameters   ({ param ("attack"),    param ("decay"),    param ("sustain"),    param ("release") });
+    // --- Enveloppes (les durées de decay peuvent être modulées par la matrice, voir plus bas)
+    const float ampA = param ("attack"),    ampD = param ("decay"),    ampS = param ("sustain"),    ampR = param ("release");
+    const float fltA = param ("fltAttack"), fltD = param ("fltDecay"), fltS = param ("fltSustain"), fltR = param ("fltRelease");
+    adsr.setParameters   ({ ampA, ampD, ampS, ampR });
     modEnv.setParameters ({ param ("modAttack"), param ("modDecay"), param ("modSustain"), param ("modRelease") });
-    fltEnv.setParameters ({ param ("fltAttack"), param ("fltDecay"), param ("fltSustain"), param ("fltRelease") });
+    fltEnv.setParameters ({ fltA, fltD, fltS, fltR });
 
     // --- Filtre
     using FilterType = juce::dsp::StateVariableTPTFilterType;
@@ -466,11 +468,12 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     const float ampVel    = (1.0f - velAmp) + velAmp * velocity;
     const float wheel     = modWheel.load();
 
-    // --- Matrice de modulation : sources 0..12, cibles 0..9
+    // --- Matrice de modulation : sources 0..12, cibles 0..17
     struct Slot { int src; int dst; float amt; };
     std::array<Slot, numMixSlots> slots {};
     int numSlots = 0;
     bool resonanceModulated = false;
+    bool envTimeModulated = false;
 
     for (int s = 0; s < numMixSlots; ++s)
     {
@@ -483,6 +486,8 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
             slots[(size_t) numSlots++] = sl;
             if (sl.dst == 4)
                 resonanceModulated = true;
+            if (sl.dst == 12 || sl.dst == 13)
+                envTimeModulated = true;
         }
     }
 
@@ -536,6 +541,14 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     const float  posB    = param ("oscBPos");
     const double factorB = std::pow (2.0, std::round ((double) param ("oscBOct")) + (double) param ("oscBTune") / 1200.0);
     const float  subAmt  = param ("subLevel");
+
+    // --- Warp, FM, ring
+    const int   warpModeA  = (int) param ("warpModeA");
+    const int   warpModeB  = (int) param ("warpModeB");
+    const float warpAmtA   = param ("warpAmtA");
+    const float warpAmtB   = param ("warpAmtB");
+    const float fmAmount   = param ("fmAmount");
+    const float ringAmount = param ("ringAmount");
 
     // --- Hauteur : glide, pitch bend, modulation
     const double glideSec  = param ("glide");
@@ -594,7 +607,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         src[8] = lfo2;
         src[9] = macros[0];  src[10] = macros[1];  src[11] = macros[2];  src[12] = macros[3];
 
-        std::array<float, 10> tgt {};
+        std::array<float, 18> tgt {};
         for (int s = 0; s < numSlots; ++s)
         {
             const auto& sl = slots[(size_t) s];
@@ -606,21 +619,47 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
             modPitch  = tgt[5] * 12.0f;
             detuneNow = juce::jlimit (0.0f, 100.0f, detune + tgt[6] * 50.0f);
             updatePitch (32);
+
+            if (envTimeModulated)       // un LFO ou une macro peut faire varier la durée des enveloppes
+            {
+                adsr.setParameters   ({ ampA, juce::jlimit (0.001f, 20.0f, ampD * std::exp2 (tgt[12] * 3.0f)), ampS, ampR });
+                fltEnv.setParameters ({ fltA, juce::jlimit (0.001f, 20.0f, fltD * std::exp2 (tgt[13] * 3.0f)), fltS, fltR });
+            }
         }
 
         // Position dans la wavetable = réglage de base + LFO + enveloppe de modulation + matrice
-        const float posA = position.getNextValue() + lfoDepth * lfo + modAmount * mEnv + tgt[1];
+        const float posA = position.getNextValue() + lfoDepth * lfo + (modAmount + tgt[11]) * mEnv + tgt[1];
         const float posBNow = posB + tgt[2];
         const float levelBNow = juce::jlimit (0.0f, 1.0f, levelB + tgt[7]);
 
-        // Oscillateurs A et B (avec unison)
+        // Oscillateurs A et B (avec unison) : warp, FM (B fait vibrer la phase de A) et ring (A x B)
+        const float warpA = juce::jlimit (0.0f, 1.0f, warpAmtA + tgt[14]);
+        const float warpB = juce::jlimit (0.0f, 1.0f, warpAmtB + tgt[15]);
+        const float fm    = juce::jlimit (0.0f, 1.0f, fmAmount + tgt[16]);
+        const float ring  = juce::jlimit (0.0f, 1.0f, ringAmount + tgt[17]);
+        const bool  needB = levelBNow > 0.0f || fm > 0.001f || ring > 0.001f;
+
         float l = 0.0f, r = 0.0f;
         for (int u = 0; u < uni; ++u)
         {
             const auto k = (size_t) u;
-            float s = bank.getSample (tabA, posA, mipA, phasesA[k]);
-            if (levelBNow > 0.0f)
-                s += levelBNow * bank.getSample (tabB, posBNow, mipB, phasesB[k]);
+
+            float sB = 0.0f;
+            if (needB)
+                sB = bank.getSample (tabB, posBNow, mipB, warpPhase (warpModeB, warpB, phasesB[k]));
+
+            double phaseA = phasesA[k];
+            if (fm > 0.001f)
+            {
+                phaseA += (double) (fm * 1.5f * sB);
+                phaseA -= std::floor (phaseA);
+            }
+
+            const float sA = bank.getSample (tabA, posA, mipA, warpPhase (warpModeA, warpA, phaseA));
+
+            float s = sA + levelBNow * sB;
+            if (ring > 0.001f)
+                s += ring * (sA * sB * 1.4f - s);
 
             l += s * gainL[k];
             r += s * gainR[k];
@@ -653,7 +692,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         }
 
         // Filtre : enveloppe (jusqu'à +/- 5 octaves), matrice et vélocité
-        const float octaves = fltAmount * fEnv * 5.0f + tgt[3] * 5.0f + velTerm;
+        const float octaves = (fltAmount + tgt[10]) * fEnv * 5.0f + tgt[3] * 5.0f + velTerm;
         const float cutoff = juce::jlimit (20.0f, 20000.0f, baseCutoff * std::exp2 (octaves));
         filter.setCutoffFrequency (cutoff);
         if (twoPole)
@@ -797,6 +836,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addFloat ("oscBLevel", "B Niveau", unit, 0.0f);
     addFloat ("subLevel",  "Sub Niveau", unit, 0.0f);
 
+    // Warp, FM et ring : de quoi travailler le son bien plus loin
+    addChoice ("warpModeA", "Warp A Mode", warpModeNames(), 0);
+    addFloat  ("warpAmtA",  "Warp A", unit, 0.0f);
+    addChoice ("warpModeB", "Warp B Mode", warpModeNames(), 0);
+    addFloat  ("warpAmtB",  "Warp B", unit, 0.0f);
+    addFloat  ("fmAmount",  "FM (B vers A)", unit, 0.0f);
+    addFloat  ("ringAmount", "Ring (A x B)", unit, 0.0f);
+
     // Unison
     addInt   ("unison", "Unison", 1, 7, 3);
     addFloat ("detune", "Desaccord (cents)", NormalisableRange<float> (0.0f, 100.0f), 15.0f);
@@ -893,6 +940,12 @@ MonSyntheProcessor::MonSyntheProcessor()
     for (auto& v : scopeRing)
         v.store (0.0f);
 
+    {
+        const auto themeFile = getPresetDirectory().getParentDirectory().getChildFile ("theme.txt");
+        if (themeFile.existsAsFile())
+            themeHue = juce::jlimit (0.0f, 1.0f, themeFile.loadFileAsString().trim().getFloatValue());
+    }
+
     synth.addSound (new SynthSound());
     for (int i = 0; i < 8; ++i)               // 8 voix de polyphonie
         synth.addVoice (new SynthVoice (apvts, bank, modWheel, hostBpm));
@@ -940,17 +993,37 @@ void MonSyntheProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     }
 
     double bpmNow = param ("seqTempo");                       // à défaut d'hôte : le tempo libre
+    bool playingNow = false;
+    double ppqNow = 0.0;
     if (auto* ph = getPlayHead())
+    {
         if (auto pos = ph->getPosition())
+        {
             if (auto hostTempo = pos->getBpm())
                 bpmNow = *hostTempo;
+            playingNow = pos->getIsPlaying();
+            if (auto ppq = pos->getPpqPosition())
+                ppqNow = *ppq;
+        }
+    }
     hostBpm = bpmNow;
+    hostPlaying = playingNow;
+    hostPpq = ppqNow;
 
     synth.setMono (param ("mono") > 0.5f);
     generateSequencerMidi (midi, numSamples);
     synth.renderNextBlock (buffer, midi, 0, numSamples);
 
     applyEffects (buffer);
+
+    // Voyants : quelles voix jouent
+    {
+        int mask = 0;
+        for (int i = 0; i < synth.getNumVoices() && i < 30; ++i)
+            if (synth.getVoice (i)->isVoiceActive())
+                mask |= (1 << i);
+        activeVoiceMask = mask;
+    }
 
     // Copie de la sortie (mono) pour l'analyseur de spectre
     {
@@ -1344,6 +1417,11 @@ bool MonSyntheProcessor::deletePreset (const juce::String& name)
 //==============================================================================
 // Matrice de modulation : noms des sources et des cibles
 //==============================================================================
+juce::StringArray MonSyntheProcessor::warpModeNames()
+{
+    return { "OFF", "BEND+", "BEND-", "SYNC", "MIRROR" };
+}
+
 juce::StringArray MonSyntheProcessor::lfoSyncNames()
 {
     return { "LIBRE", "4 MES", "2 MES", "1 MES", "1/2", "1/4", "1/8", "1/16", "1/32" };
@@ -1357,7 +1435,8 @@ juce::StringArray MonSyntheProcessor::modSourceNames()
 
 juce::StringArray MonSyntheProcessor::modTargetNames()
 {
-    return { "---", "POSITION A", "POSITION B", "CUTOFF", "RESO", "HAUTEUR", "DESACCORD", "NIVEAU B", "DRIVE", "VOLUME" };
+    return { "---", "POSITION A", "POSITION B", "CUTOFF", "RESO", "HAUTEUR", "DESACCORD", "NIVEAU B", "DRIVE", "VOLUME",
+             "QTE ENV FILTRE", "QTE ENV MOD", "DECAY VOL", "DECAY FILTRE", "WARP A", "WARP B", "FM", "RING" };
 }
 
 //==============================================================================
@@ -1474,6 +1553,34 @@ static const std::vector<FactoryPreset>& factoryPresets()
             { "modAmount", 0.5f }, { "lfoDepth", 0.0f }, { "unison", 3.0f }, { "detune", 14.0f }, { "cutoff", 5000.0f },
             { "attack", 0.3f }, { "decay", 0.8f }, { "sustain", 0.8f }, { "release", 0.8f }, { "reverbMix", 0.3f } } },
 
+        { "FM Bell", "PLUCKS", {
+            { "position", 0.0f }, { "oscBPos", 0.0f }, { "oscBOct", 1.0f }, { "fmAmount", 0.3f },
+            { "unison", 1.0f }, { "spread", 0.0f }, { "cutoff", 12000.0f },
+            { "attack", 0.002f }, { "decay", 1.8f }, { "sustain", 0.0f }, { "release", 1.2f },
+            { "modAttack", 0.002f }, { "modDecay", 0.9f }, { "modSustain", 0.0f }, { "modAmount", 0.0f }, { "lfoDepth", 0.0f },
+            { "mx1Src", 2.0f }, { "mx1Dst", 16.0f }, { "mx1Amt", 0.6f },
+            { "reverbMix", 0.35f }, { "reverbSize", 0.8f } } },
+
+        { "Sync Lead", "LEADS", {
+            { "mono", 1.0f }, { "glide", 0.06f }, { "position", 0.43f }, { "warpModeA", 3.0f }, { "warpAmtA", 0.25f },
+            { "unison", 3.0f }, { "detune", 12.0f }, { "spread", 0.6f }, { "cutoff", 7000.0f },
+            { "lfoShape", 1.0f }, { "lfoRate", 0.8f }, { "lfoDepth", 0.0f }, { "modAmount", 0.0f },
+            { "mx1Src", 1.0f }, { "mx1Dst", 14.0f }, { "mx1Amt", 0.35f },
+            { "attack", 0.005f }, { "decay", 0.3f }, { "sustain", 0.8f }, { "release", 0.25f }, { "delayMix", 0.2f } } },
+
+        { "Ring Metal", "TEXTURES", {
+            { "position", 0.43f }, { "oscBPos", 0.0f }, { "oscBOct", 1.0f }, { "oscBTune", 15.0f }, { "ringAmount", 0.6f },
+            { "unison", 2.0f }, { "detune", 6.0f }, { "cutoff", 5000.0f }, { "lfoDepth", 0.0f }, { "modAmount", 0.0f },
+            { "attack", 0.003f }, { "decay", 0.9f }, { "sustain", 0.2f }, { "release", 0.6f },
+            { "lfo2Rate", 0.3f }, { "mx1Src", 8.0f }, { "mx1Dst", 17.0f }, { "mx1Amt", 0.3f } } },
+
+        { "Pulse Keys", "CLAVIERS", {
+            { "position", 0.43f }, { "unison", 2.0f }, { "detune", 8.0f }, { "cutoff", 600.0f }, { "resonance", 2.0f },
+            { "fltEnvAmount", 0.5f }, { "fltDecay", 0.35f }, { "fltSustain", 0.2f },
+            { "attack", 0.003f }, { "decay", 0.8f }, { "sustain", 0.5f }, { "release", 0.4f },
+            { "lfoShape", 1.0f }, { "lfoSync", 6.0f }, { "lfoDepth", 0.0f }, { "modAmount", 0.0f },
+            { "mx1Src", 1.0f }, { "mx1Dst", 10.0f }, { "mx1Amt", 0.6f } } },
+
         { "Velocity Brass", "LEADS", {
             { "position", 0.43f }, { "unison", 3.0f }, { "detune", 9.0f }, { "filterType", 0.0f }, { "cutoff", 700.0f },
             { "fltEnvAmount", 0.5f }, { "fltAttack", 0.12f }, { "fltDecay", 0.5f }, { "fltSustain", 0.5f },
@@ -1520,6 +1627,18 @@ void MonSyntheProcessor::loadFactoryPreset (int index)
     for (const auto& kv : presets[(size_t) index].values)
         if (auto* rp = apvts.getParameter (kv.first))
             rp->setValueNotifyingHost (rp->convertTo0to1 (kv.second));
+}
+
+void MonSyntheProcessor::setThemeHue (float hue, bool save)
+{
+    themeHue = juce::jlimit (0.0f, 1.0f, hue);
+
+    if (save)
+    {
+        const auto themeFile = getPresetDirectory().getParentDirectory().getChildFile ("theme.txt");
+        themeFile.getParentDirectory().createDirectory();
+        themeFile.replaceWithText (juce::String (themeHue.load(), 4));
+    }
 }
 
 juce::AudioProcessorEditor* MonSyntheProcessor::createEditor()

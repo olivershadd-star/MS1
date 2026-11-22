@@ -3,6 +3,41 @@
 #include <juce_dsp/juce_dsp.h>
 #include <array>
 
+// Déformation de la phase d'un oscillateur ("warp") : 0 OFF, 1 BEND+, 2 BEND-, 3 SYNC, 4 MIRROR
+inline double warpPhase (int mode, float amount, double p) noexcept
+{
+    if (mode <= 0 || amount <= 0.0001f)
+        return p;
+
+    const double w = (double) amount;
+
+    switch (mode)
+    {
+        case 1:                                  // BEND+ : on s'attarde au début du cycle
+        {
+            const double p2 = p * p;
+            return w < 0.5 ? p + (p2 - p) * (2.0 * w) : p2 + (p2 * p - p2) * (2.0 * w - 1.0);
+        }
+        case 2:                                  // BEND- : on s'attarde à la fin du cycle
+        {
+            const double q = 1.0 - p, q2 = q * q;
+            const double r = w < 0.5 ? q + (q2 - q) * (2.0 * w) : q2 + (q2 * q - q2) * (2.0 * w - 1.0);
+            return 1.0 - r;
+        }
+        case 3:                                  // SYNC : le cycle se répète plus vite
+        {
+            const double t = p * (1.0 + 7.0 * w);
+            return t - std::floor (t);
+        }
+        default:                                 // MIRROR : le cycle est replié en miroir
+        {
+            const double t = p * (1.0 + 3.0 * w);
+            const double f = t - std::floor (t);
+            return 1.0 - std::abs (2.0 * f - 1.0);
+        }
+    }
+}
+
 //==============================================================================
 // Banque de wavetables : 8 formes d'onde ("frames"), chacune stockée en
 // 10 versions limitées en bande (une par octave) pour éviter le repliement.
@@ -180,6 +215,14 @@ public:
 
     const WavetableBank& getBank() const noexcept { return bank; }
 
+    // Pour l'interface : couleur du thème et voyants d'activité
+    float getThemeHue() const noexcept            { return themeHue.load(); }
+    void setThemeHue (float hue, bool save);
+    int getActiveVoiceMask() const noexcept       { return activeVoiceMask.load(); }
+    double getHostPpq() const noexcept            { return hostPpq.load(); }
+    bool isHostPlaying() const noexcept           { return hostPlaying.load(); }
+    double getHostBpm() const noexcept            { return hostBpm.load(); }
+
     // Retour visuel : derniers échantillons de sortie (les plus récents à la fin)
     void copyRecentSamples (float* dest, int numSamples) const;
 
@@ -198,6 +241,7 @@ public:
     void loadFactoryPreset (int index);
 
     // Listes de la matrice de modulation
+    static juce::StringArray warpModeNames();
     static juce::StringArray lfoSyncNames();
     static juce::StringArray modSourceNames();
     static juce::StringArray modTargetNames();
@@ -221,6 +265,10 @@ private:
 
     std::atomic<float> modWheel { 0.0f };    // molette de modulation (CC1), lue par les voix
     std::atomic<double> hostBpm { 120.0 };   // tempo de l'hôte, lu par les voix (LFO synchronisés)
+    std::atomic<double> hostPpq { 0.0 };     // position de lecture de l'hôte, en temps
+    std::atomic<bool> hostPlaying { false };
+    std::atomic<int> activeVoiceMask { 0 };  // voix en cours de jeu (un bit par voix)
+    std::atomic<float> themeHue { 0.52f };   // couleur centrale de l'interface
     WavetableBank bank;      // doit rester déclaré avant "synth"
     MonoCapableSynth synth;
 

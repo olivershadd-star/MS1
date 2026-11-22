@@ -2,22 +2,49 @@
 #include "PluginProcessor.h"
 
 //==============================================================================
-// Palette : fonds sombres bleutés, accents froids (cyan, azur, bleu, indigo, violet, turquoise)
+// Palette dynamique : tout se déduit d'une teinte centrale (comme la règle RGB d'Ableton).
+// Les 6 accents sont des couleurs voisines de la teinte choisie, les fonds sont des gris anthracite teintés.
 namespace Pal
 {
-    inline const juce::Colour bg      { 0xff06080d };
-    inline const juce::Colour panel   { 0xff0b0f18 };
-    inline const juce::Colour panelHi { 0xff131a29 };
-    inline const juce::Colour line    { 0xff1d2638 };
-    inline const juce::Colour text    { 0xffd6e2f5 };
-    inline const juce::Colour dim     { 0xff6f7f99 };
+    inline float hue = 0.52f;
 
-    inline const juce::Colour cyan    { 0xff2fe0ff };
-    inline const juce::Colour azure   { 0xff3f9bff };
-    inline const juce::Colour blue    { 0xff5b7cff };
-    inline const juce::Colour indigo  { 0xff8a7bff };
-    inline const juce::Colour violet  { 0xffb27bff };
-    inline const juce::Colour teal    { 0xff2ee6c6 };
+    inline juce::Colour bg, panel, panelHi, line, grid, text, dim;
+    inline juce::Colour cyan, azure, blue, indigo, violet, teal;      // accents 0..5
+
+    inline void update (float h)
+    {
+        hue = h - std::floor (h);
+        auto wrap = [] (float v) { return v - std::floor (v); };
+        auto accent = [&] (float offset, float sat) { return juce::Colour::fromHSV (wrap (hue + offset), sat, 1.0f, 1.0f); };
+
+        cyan   = accent ( 0.000f, 0.80f);
+        azure  = accent ( 0.060f, 0.75f);
+        blue   = accent ( 0.120f, 0.70f);
+        indigo = accent ( 0.180f, 0.60f);
+        violet = accent (-0.060f, 0.80f);
+        teal   = accent (-0.120f, 0.80f);
+
+        bg      = juce::Colour::fromHSV (hue, 0.30f, 0.050f, 1.0f);
+        panel   = juce::Colour::fromHSV (hue, 0.16f, 0.095f, 1.0f);
+        panelHi = juce::Colour::fromHSV (hue, 0.16f, 0.150f, 1.0f);
+        line    = juce::Colour::fromHSV (hue, 0.18f, 0.230f, 1.0f);
+        grid    = juce::Colour::fromHSV (hue, 0.10f, 0.220f, 1.0f);
+        text    = juce::Colour::fromHSV (hue, 0.08f, 0.96f, 1.0f);
+        dim     = juce::Colour::fromHSV (hue, 0.14f, 0.66f, 1.0f);
+    }
+
+    inline juce::Colour role (int i)
+    {
+        switch (i)
+        {
+            case 0:  return cyan;
+            case 1:  return azure;
+            case 2:  return blue;
+            case 3:  return indigo;
+            case 4:  return violet;
+            default: return teal;
+        }
+    }
 
     inline juce::Font mono (float size, bool bold = false)
     {
@@ -30,8 +57,9 @@ namespace Pal
 class CyberLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
-    CyberLookAndFeel();
+    CyberLookAndFeel() = default;
 
+    void refreshColours();      // à appeler après Pal::update()
     void setScale (float s) noexcept { scale = s; }
     float getScale() const noexcept  { return scale; }
 
@@ -61,7 +89,86 @@ private:
 };
 
 //==============================================================================
-// Analyseur de spectre de la sortie, en segments (affiché dans l'en-tête)
+// Bouton de menu avec un voyant (LED) en haut à gauche
+class LedButton : public juce::TextButton
+{
+public:
+    void setLed (float level, juce::Colour colour)
+    {
+        if (std::abs (level - ledLevel) > 0.02f || colour != ledColour)
+        {
+            ledLevel = level;
+            ledColour = colour;
+            repaint();
+        }
+    }
+
+    void paintButton (juce::Graphics& g, bool highlighted, bool down) override
+    {
+        juce::TextButton::paintButton (g, highlighted, down);
+
+        const float s = juce::jmax (4.0f, (float) getHeight() * 0.17f);
+        const juce::Rectangle<float> led (6.0f, 6.0f, s, s);
+
+        if (ledLevel > 0.3f)
+        {
+            g.setColour (ledColour.withAlpha (0.28f * ledLevel));
+            g.fillRect (led.expanded (2.5f));
+        }
+        g.setColour (ledColour.withAlpha (0.12f + 0.88f * ledLevel));
+        g.fillRect (led);
+    }
+
+private:
+    float ledLevel = 0.0f;
+    juce::Colour ledColour { juce::Colours::white };
+};
+
+//==============================================================================
+// Règle de couleur : on glisse pour changer la teinte centrale de toute l'interface
+class HueBar : public juce::Component
+{
+public:
+    std::function<void (float, bool)> onChange;       // (teinte, true quand on relâche la souris)
+
+    void setValue (float v) { value = v; repaint(); }
+
+    void paint (juce::Graphics& g) override
+    {
+        const auto r = getLocalBounds().toFloat().reduced (1.0f);
+        const auto bar = r.withTrimmedTop (r.getHeight() * 0.30f).withTrimmedBottom (r.getHeight() * 0.30f);
+
+        juce::ColourGradient grad (juce::Colour::fromHSV (0.0f, 0.8f, 1.0f, 1.0f), r.getX(), 0.0f,
+                                   juce::Colour::fromHSV (1.0f, 0.8f, 1.0f, 1.0f), r.getRight(), 0.0f, false);
+        for (int i = 1; i < 6; ++i)
+            grad.addColour ((double) i / 6.0, juce::Colour::fromHSV ((float) i / 6.0f, 0.8f, 1.0f, 1.0f));
+
+        g.setGradientFill (grad);
+        g.fillRect (bar);
+
+        const float x = r.getX() + value * r.getWidth();
+        g.setColour (juce::Colours::white);
+        g.fillRect (x - 1.5f, r.getY(), 3.0f, r.getHeight());
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override { setFromX (e.x, false); }
+    void mouseDrag (const juce::MouseEvent& e) override { setFromX (e.x, false); }
+    void mouseUp (const juce::MouseEvent& e) override   { setFromX (e.x, true); }
+
+private:
+    void setFromX (int x, bool released)
+    {
+        value = juce::jlimit (0.0f, 1.0f, (float) x / (float) juce::jmax (1, getWidth()));
+        repaint();
+        if (onChange)
+            onChange (value, released);
+    }
+
+    float value = 0.5f;
+};
+
+//==============================================================================
+// Analyseur de spectre de la sortie, en segments
 class SpectrumView : public juce::Component
 {
 public:
@@ -93,6 +200,8 @@ class StepGrid : public juce::Component
 public:
     StepGrid (MonSyntheProcessor& p, juce::Colour accentColour) : proc (p), accent (accentColour) {}
 
+    void setAccent (juce::Colour c) { accent = c; repaint(); }
+
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
@@ -118,6 +227,8 @@ private:
 };
 
 //==============================================================================
+// Éditeur : menus à gauche, deux écrans (A et B) avec chacun 4 potards fixes, macros à droite,
+// séquenceur en bas. Les 8 potards fixes se réassignent automatiquement selon le menu choisi.
 class MonSyntheEditor : public juce::AudioProcessorEditor,
                         public juce::FileDragAndDropTarget,
                         private juce::Timer
@@ -141,82 +252,104 @@ private:
         juce::Slider slider;
         juce::Label label;
         std::unique_ptr<APVTS::SliderAttachment> attachment;   // détruit en premier
+        int role = 0;
+        bool linear = false;
     };
 
-    struct PageItem { juce::Component* comp; int page; };
-    struct Panel    { int page; juce::Rectangle<int> area; juce::String title; juce::Colour colour; };
+    enum Viz { VizNone = 0, VizScopeA, VizUnison, VizScopeB, VizFmRing, VizFilter,
+               VizEnvFilter, VizEnvAmp, VizEnvMod, VizLfo1, VizLfo2, VizGlide,
+               VizChorus, VizDelay, VizReverb, VizMatrix, VizSpectrum };
+
+    struct ParamSlot { const char* id; const char* label; };
+    struct MenuDef   { const char* name; int role; int vizA; int vizB; ParamSlot p[8]; };
+
+    struct ComboRef  { juce::ComboBox* box; int role; };
+    struct ButtonRef { juce::TextButton* button; int role; };
+    struct NamedCombo { juce::ComboBox box; std::unique_ptr<APVTS::ComboBoxAttachment> att; };
 
     // L'interface est dessinée pour 1280 x 720 puis mise à l'échelle (fenêtre redimensionnable, 16:9)
     static constexpr int baseWidth = 1280, baseHeight = 720;
-    static constexpr int pageSynth = 0, pageMod = 1, pageSeq = 2;
+    static constexpr int numMenus = 14, matrixMenu = 13;
+
+    static const MenuDef& menuAt (int index);
 
     int S (float v) const noexcept { return juce::roundToInt (v * scale); }
+    float pv (const char* id) const;
 
-    Knob* makeKnob (int page, const juce::String& paramId, const juce::String& name, juce::Colour colour,
-                    bool linear = false);
-    void styleCombo (int page, juce::ComboBox&, juce::Colour colour, const juce::StringArray& items);
-    void setupCombo (int page, juce::ComboBox&, juce::Label&, const juce::String& title, juce::Colour colour,
-                     const juce::StringArray& items);
-    void updatePageVisibility();
+    Knob* makeKnob (const juce::String& paramId, const juce::String& name, int role, bool linear = false);
+    void styleButton (juce::TextButton&, int role);
+
+    void selectMenu (int index);
+    void updateMenuVisibility();
+    void applyTheme();
+    void updateLeds();
 
     void placeKnob (Knob* k, juce::Rectangle<int> bounds);
     void layoutRow (const std::vector<Knob*>& items, juce::Rectangle<int> content);
-    void placeCombo (juce::Label& label, juce::ComboBox& box, juce::Rectangle<int> bounds);
 
     void importWavetable (int slot);
     void loadWavetableFile (int slot, const juce::File& file);
-
     void refreshPresetList (const juce::String& select = {});
     void stepPreset (int delta);
 
-    void drawPanel (juce::Graphics&, const Panel&);
+    // Dessin
+    void drawPanel (juce::Graphics&, juce::Rectangle<int> area, const juce::String& title, juce::Colour colour,
+                    const juce::String& rightText = {});
     void drawLogo (juce::Graphics&, juce::Rectangle<int> area);
-    void drawScope (juce::Graphics&, juce::Rectangle<float> area);
+    void drawScreen (juce::Graphics&, juce::Rectangle<int> panelArea, juce::Rectangle<int> gfxArea, bool isA);
+    void drawViz (juce::Graphics&, int viz, juce::Rectangle<float> r, juce::Colour colour);
+    void drawScopeViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour, bool forB);
+    void drawUnisonViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
+    void drawFmRingViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
+    void drawFilterViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
+    void drawEnvelopeViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour,
+                          const char* a, const char* d, const char* s, const char* rel);
+    void drawLfoViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour, bool second);
+    void drawGlideViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
+    void drawChorusViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
+    void drawDelayViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
+    void drawReverbViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
     void timerCallback() override;
 
     MonSyntheProcessor& proc;
     CyberLookAndFeel laf;
     float scale = 1.0f;
+    int currentMenu = 0;
 
-    int page = 0;
-    std::vector<PageItem> pageItems;
-    std::vector<Panel> panels;
-
-    // Boutons rotatifs / curseurs
+    // Tous les boutons rotatifs / curseurs
     std::vector<std::unique_ptr<Knob>> knobs;
-    Knob* waveKnob = nullptr;
+    std::array<Knob*, 8> fixedKnobs {};          // P1..P8 : réassignés selon le menu
+    std::array<Knob*, 4> macroKnobs {};
+    Knob* masterKnob = nullptr;
     Knob* gateKnob = nullptr;
     Knob* tempoKnob = nullptr;
     std::array<Knob*, 6> mixAmt {};
-    std::vector<Knob*> oscBKnobs, unisonKnobs, lfoKnobs, modKnobs,
-                       filterKnobs, fltEnvKnobs, ampKnobs, jeuKnobs,
-                       chorusKnobs, delayKnobs, reverbKnobs, velKnobs, lfo2Knobs, macroKnobs;
 
-    // Listes déroulantes
-    juce::ComboBox lfoShapeBox, lfoSyncBox, lfo2ShapeBox, lfo2SyncBox, filterTypeBox, barsBox, rateBox, tableABox, tableBBox;
-    juce::Label lfoShapeLabel, lfoSyncLabel, lfo2ShapeLabel, lfo2SyncLabel, filterTypeLabel, barsLabel, rateLabel,
-                tableALabel, tableBLabel;
-    std::unique_ptr<APVTS::ComboBoxAttachment> lfoShapeAttachment, lfoSyncAttachment,
-                                               lfo2ShapeAttachment, lfo2SyncAttachment,
-                                               filterTypeAttachment, barsAttachment, rateAttachment,
-                                               tableAAttachment, tableBAttachment;
+    NamedCombo tableA, tableB, warpA, warpB, filterType, lfoShape, lfoSync, lfo2Shape, lfo2Sync;
+    juce::TextButton monoButton;
+    std::unique_ptr<APVTS::ButtonAttachment> monoAttachment;
+    std::vector<std::pair<juce::Rectangle<int>, juce::String>> captions;
+
+    // Menus
+    std::array<LedButton, numMenus> menuButtons;
+
+    // Séquenceur
+    juce::TextButton seqButton;
+    juce::ComboBox barsBox, rateBox;
+    juce::Label barsLabel, rateLabel;
+    std::unique_ptr<APVTS::ButtonAttachment> seqButtonAttachment;
+    std::unique_ptr<APVTS::ComboBoxAttachment> barsAttachment, rateAttachment;
+    StepGrid grid;
 
     // Matrice de modulation (6 routes)
     std::array<juce::ComboBox, 6> mixSrcBox, mixDstBox;
     std::array<std::unique_ptr<APVTS::ComboBoxAttachment>, 6> mixSrcAtt, mixDstAtt;
     juce::Label mixHdrSrc, mixHdrDst, mixHdrAmt;
+    std::vector<juce::Component*> matrixComponents;
 
-    // Boutons on/off
-    juce::TextButton monoButton, seqButton;
-    std::unique_ptr<APVTS::ButtonAttachment> monoAttachment, seqButtonAttachment;
-
-    StepGrid grid;
-    SpectrumView spectrum;
-
-    // Onglets
-    std::array<juce::TextButton, 3> tabButtons;
-
-    // Presets
+    // En-tête
+    SpectrumView headerSpectrum, screenSpectrum;
+    HueBar hueBar;
     juce::ComboBox presetBox;
     juce::TextButton prevButton { "<" }, nextButton { ">" }, saveButton { "SAVE" }, deleteButton { "SUPPR" };
     juce::TextEditor nameEditor;
@@ -224,13 +357,23 @@ private:
 
     // Import de wavetables
     std::unique_ptr<juce::FileChooser> chooser;
-    juce::TextButton importAButton { "IMPORT WAV" }, importBButton { "WAV" };
+    juce::TextButton importAButton { "IMPORT WAV" }, importBButton { "IMPORT WAV" };
     juce::String statusMessage;
     int statusFrames = 0;
-    juce::Rectangle<int> oscAArea, oscBArea;
+    juce::Rectangle<int> oscAArea, oscBArea;          // (zones de dépôt des fichiers)
 
-    juce::Rectangle<int> scopeArea;
-    float lastPos = -1.0f;
+    // Zones
+    juce::Rectangle<int> menuPanel, screenAPanel, screenBPanel, gfxA, gfxB, macrosPanel, outPanel, seqPanel,
+                         matrixArea, ledsArea, meterArea, beatLedArea, stripA, stripB, knobsA, knobsB;
+    juce::Rectangle<int> scopeArea;                   // = zone graphique de l'écran A
+
+    // Mise à jour des couleurs
+    std::vector<ComboRef> comboRefs;
+    std::vector<ButtonRef> buttonRefs;
+    std::vector<juce::Label*> dimLabels;
+
+    float outLevel = 0.0f;
+    float lastSig = -1.0f;
     int lastTable = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MonSyntheEditor)
