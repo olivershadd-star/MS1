@@ -10,25 +10,42 @@ class WavetableBank
 {
 public:
     static constexpr int tableSize = 2048;
-    static constexpr int numFrames = 8;
+    static constexpr int numTables = 8;         // 8 wavetables intégrées ...
+    static constexpr int numFrames = 8;         // ... de 8 formes d'onde chacune
     static constexpr int numLevels = 10;
+    static constexpr int numUserTables = 2;     // + 2 emplacements pour tes propres fichiers .wav
+    static constexpr int totalTables = numTables + numUserTables;
+    static constexpr int maxUserFrames = 64;
 
     WavetableBank();
 
     static int levelForFrequency (double hz) noexcept;
+    static juce::StringArray tableNames();
 
-    // position : 0..1 (balaie les 8 formes d'onde), phase : 0..1
-    float getSample (float position, int level, double phase) const noexcept;
+    // tableIndex : 0..9, position : 0..1 (balaie les formes d'onde), phase : 0..1
+    float getSample (int tableIndex, float position, int level, double phase) const noexcept;
+
+    // Construit une table utilisateur à partir de formes d'onde de 2048 échantillons (numUserFrames à la suite).
+    // À appeler depuis le thread de l'interface : la table est préparée à part puis activée d'un coup.
+    void setUserTable (int slot, const std::vector<float>& frames, int numUserFrames);
 
 private:
-    const float* table (int frame, int level) const noexcept
+    size_t offsetOf (int t, int frame, int level) const noexcept
     {
-        return data.data() + (size_t) (frame * numLevels + level) * tableSize;
+        return (size_t) ((t * numFrames + frame) * numLevels + level) * tableSize;
     }
 
-    static float harmonicAmp (int frame, int harmonic);
+    static float harmonicAmp (int tableIndex, int frame, int harmonic);
 
     std::vector<float> data;
+
+    struct UserSlot
+    {
+        std::array<std::vector<float>, 2> buffers;     // double tampon : on prépare l'un pendant que l'autre joue
+        std::array<int, 2> frames { 0, 0 };
+        std::atomic<int> active { 0 };
+    };
+    std::array<UserSlot, numUserTables> userSlots;
 };
 
 //==============================================================================
@@ -63,9 +80,10 @@ class SynthVoice : public juce::SynthesiserVoice
 {
 public:
     static constexpr int maxUnison = 7;
+    static constexpr int numMixSlots = 6;
 
-    SynthVoice (juce::AudioProcessorValueTreeState& state, const WavetableBank& wavetables)
-        : apvts (state), bank (wavetables) {}
+    SynthVoice (juce::AudioProcessorValueTreeState& state, const WavetableBank& wavetables,
+                std::atomic<float>& modWheelRef, std::atomic<double>& bpmRef);
 
     void prepare (double sampleRate, int blockSize);
 
@@ -89,6 +107,9 @@ private:
 
     juce::AudioProcessorValueTreeState& apvts;
     const WavetableBank& bank;
+    std::atomic<float>& modWheel;
+    std::atomic<double>& hostBpm;
+    std::array<std::atomic<float>*, numMixSlots * 3> mixParams {};   // source, cible, quantité de chaque route
 
     juce::ADSR adsr;      // volume
     juce::ADSR modEnv;    // position de la wavetable
@@ -100,12 +121,14 @@ private:
     std::array<double, maxUnison> phasesA {}, phasesB {};
     double phaseSub = 0.0;
     double lfoPhase = 0.0;
+    double lfo2Phase = 0.0;
     juce::Random rng;
 
     double currentNote = 60.0;     // note actuelle (peut glisser vers targetNote)
     double targetNote = 60.0;
     float bendNorm = 0.0f;         // pitch bend, de -1 à +1
-    float gain = 0.0f;
+    float velocity = 0.0f;
+    float noteRandom = 0.0f;       // valeur aléatoire tirée à chaque note (-1..1)
     bool keyDown = false;
 };
 
@@ -157,9 +180,27 @@ public:
 
     const WavetableBank& getBank() const noexcept { return bank; }
 
+    // Retour visuel : derniers échantillons de sortie (les plus récents à la fin)
+    void copyRecentSamples (float* dest, int numSamples) const;
+
     // Séquenceur
     StepSequencerData sequencer;
     std::atomic<int> currentStep { -1 };
+
+    // Wavetables importées depuis un fichier audio (emplacements USER 1 et USER 2)
+    bool loadUserWavetable (int slot, const juce::File& file, juce::String& error);
+    juce::String getUserTableName (int slot) const;
+
+    // Presets d'usine
+    static int getNumFactoryPresets();
+    static juce::String getFactoryPresetName (int index);
+    static juce::String getFactoryPresetCategory (int index);
+    void loadFactoryPreset (int index);
+
+    // Listes de la matrice de modulation
+    static juce::StringArray lfoSyncNames();
+    static juce::StringArray modSourceNames();
+    static juce::StringArray modTargetNames();
 
     // Banque de presets (fichiers .mspreset dans le dossier utilisateur)
     static juce::File getPresetDirectory();
@@ -178,6 +219,8 @@ private:
 
     float param (const char* id) const { return apvts.getRawParameterValue (id)->load(); }
 
+    std::atomic<float> modWheel { 0.0f };    // molette de modulation (CC1), lue par les voix
+    std::atomic<double> hostBpm { 120.0 };   // tempo de l'hôte, lu par les voix (LFO synchronisés)
     WavetableBank bank;      // doit rester déclaré avant "synth"
     MonoCapableSynth synth;
 
@@ -186,6 +229,14 @@ private:
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine;
     juce::Reverb reverb;
     float lastMaster = 1.0f;
+
+    juce::String userTableNames[WavetableBank::numUserTables];
+    juce::String userTablePaths[WavetableBank::numUserTables];
+
+    // Anneau de visualisation (lu par l'analyseur de l'interface)
+    static constexpr int scopeSize = 4096;
+    std::array<std::atomic<float>, scopeSize> scopeRing;
+    std::atomic<int> scopeWrite { 0 };
 
     // Séquenceur : état interne
     int seqNote = -1;                 // note actuellement tenue par le séquenceur
