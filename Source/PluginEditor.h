@@ -426,7 +426,10 @@ private:
 
     // Import de wavetables
     std::unique_ptr<juce::FileChooser> chooser;
-    juce::TextButton importAButton { "IMPORT WAV" }, importBButton { "IMPORT WAV" };
+    juce::TextButton importAButton { "IMPORT" }, importBButton { "IMPORT" };
+    juce::TextButton resampleAButton { "RESAMPLE" }, resampleBButton { "RESAMPLE" };
+    int resampleSlot = -1;
+    void startResample (int slot);
     juce::String statusMessage;
     int statusFrames = 0;
     juce::Rectangle<int> oscAArea, oscBArea;          // (zones de dépôt des fichiers)

@@ -323,6 +323,12 @@ public:
 
     // Wavetables importées depuis un fichier audio (emplacements USER 1 et USER 2)
     bool loadUserWavetable (int slot, const juce::File& file, juce::String& error);
+
+    // Resample : capture ~3 s de la sortie des voix (avant effets), puis la transforme en wavetable USER
+    void startResample();
+    int getResampleState() const noexcept      { return capState.load(); }      // 0 repos, 1 capture, 2 prêt
+    float getResampleProgress() const noexcept { return capBuf.empty() ? 0.0f : (float) capPos.load() / (float) capBuf.size(); }
+    bool finishResample (int slot, juce::String& error);
     juce::String getUserTableName (int slot) const;
 
     // Presets d'usine
@@ -393,6 +399,9 @@ private:
     FxRack fxRack;
     std::array<std::atomic<float>*, 4 * 7> fxParams {};   // par emplacement : type, on, mix, a, b, c, d
     std::atomic<float> lastNoteHz { 0.0f };
+    std::vector<float> capBuf;
+    std::atomic<int> capPos { 0 }, capState { 0 };
+    double capSr = 44100.0;
 
     juce::String userTableNames[WavetableBank::numUserTables];
     juce::String userTablePaths[WavetableBank::numUserTables];

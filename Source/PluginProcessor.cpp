@@ -1339,6 +1339,10 @@ void MonSyntheProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     lastEqOut = 1.0f;
 
     fxRack.prepare (sampleRate, juce::jmax (samplesPerBlock, 8192));
+    capSr = sampleRate;
+    capBuf.assign ((size_t) (sampleRate * 3.0) + 1, 0.0f);
+    capPos = 0;
+    capState = 0;
 
     compressor.prepare (spec);
     limiter.prepare (spec);
@@ -1391,6 +1395,19 @@ void MonSyntheProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
         if (meta.getMessage().isNoteOn())
             lastNoteHz = (float) juce::MidiMessage::getMidiNoteInHertz (meta.getMessage().getNoteNumber());
     synth.renderNextBlock (buffer, midi, 0, numSamples);
+
+    if (capState.load (std::memory_order_acquire) == 1)
+    {
+        int pos = capPos.load (std::memory_order_relaxed);
+        const int cap = (int) capBuf.size();
+        const float* l = buffer.getReadPointer (0);
+        const float* r = buffer.getReadPointer (buffer.getNumChannels() > 1 ? 1 : 0);
+        for (int i = 0; i < numSamples && pos < cap; ++i)
+            capBuf[(size_t) pos++] = 0.5f * (l[i] + r[i]);
+        capPos.store (pos, std::memory_order_release);
+        if (pos >= cap)
+            capState.store (2, std::memory_order_release);
+    }
 
     applyEffects (buffer);
 
@@ -1945,6 +1962,171 @@ bool MonSyntheProcessor::loadUserWavetable (int slot, const juce::File& file, ju
     userTablePaths[slot] = file.getFullPathName();
     apvts.state.setProperty ("userTable" + juce::String (slot + 1), userTablePaths[slot], nullptr);
     return true;
+}
+
+void MonSyntheProcessor::startResample()
+{
+    if (capBuf.empty())
+        return;
+    capState.store (0);
+    capPos.store (0);
+    capState.store (1, std::memory_order_release);
+}
+
+bool MonSyntheProcessor::finishResample (int slot, juce::String& error)
+{
+    capState.store (0);
+    const int n = capPos.load();
+    const double sr = capSr;
+    const auto& x = capBuf;
+
+    float peak = 0.0f;
+    for (int i = 0; i < n; ++i)
+        peak = juce::jmax (peak, std::abs (x[(size_t) i]));
+    if (peak < 0.002f)
+    {
+        error = "RESAMPLE : AUCUN SON CAPTE";
+        return false;
+    }
+
+    // zone active : de la première à la dernière fenêtre de 20 ms au-dessus de 3 % du pic
+    const int blk = juce::jmax (16, (int) (sr * 0.02));
+    int s = -1, e = -1;
+    for (int i = 0; i + blk <= n; i += blk)
+    {
+        float m = 0.0f;
+        for (int k = 0; k < blk; ++k)
+            m = juce::jmax (m, std::abs (x[(size_t) (i + k)]));
+        if (m > 0.03f * peak)
+        {
+            if (s < 0) s = i;
+            e = i + blk;
+        }
+    }
+    if (s < 0 || e - s < (int) (sr * 0.15))
+    {
+        error = "RESAMPLE : SON TROP COURT (tiens la note)";
+        return false;
+    }
+
+    // période de départ : hauteur de la dernière note jouée, sinon recherche libre par autocorrélation
+    auto corr = [&] (int start, double P)
+    {
+        const int len = (int) P;
+        double ab = 0.0, aa = 1.0e-9, bb = 1.0e-9;
+        const int shift = (int) std::round (P);
+        for (int i = 0; i < len; ++i)
+        {
+            const double a = x[(size_t) (start + i)], b = x[(size_t) (start + i + shift)];
+            ab += a * b; aa += a * a; bb += b * b;
+        }
+        return ab / std::sqrt (aa * bb);
+    };
+
+    const int probe = s + (e - s) / 10;
+    double P0 = 0.0;
+    const float noteHz = lastNoteHz.load();
+    const double pMin = sr / 2000.0, pMax = juce::jmin (sr / 30.0, (double) (e - s) / 3.0);
+    {
+        double lo = pMin, hi = pMax;
+        if (noteHz > 20.0f)
+        {
+            lo = sr / noteHz * 0.94;
+            hi = sr / noteHz * 1.06;
+        }
+        double best = -2.0;
+        for (double P = lo; P <= hi; P += (noteHz > 20.0f ? 0.1 : 0.5))
+        {
+            if (probe + (int) (2.0 * P) + 2 >= n)
+                break;
+            const double c = corr (probe, P);
+            if (c > best) { best = c; P0 = P; }
+        }
+        if (P0 <= 0.0 || best < 0.3)
+        {
+            error = "RESAMPLE : HAUTEUR NON DETECTEE (son trop bruite)";
+            return false;
+        }
+    }
+
+    constexpr int N = WavetableBank::tableSize;
+    const int F = 32;
+    std::vector<float> frames ((size_t) F * N);
+    float maxAbs = 1.0e-6f;
+    double P = P0;
+    const int last = e - (int) (2.2 * P0);
+    if (last <= s)
+    {
+        error = "RESAMPLE : SON TROP COURT";
+        return false;
+    }
+
+    for (int f = 0; f < F; ++f)
+    {
+        const int c0 = s + (int) ((double) (last - s) * f / (F - 1));
+        // affine la période autour de la précédente (suit une hauteur qui dérive)
+        double bestC = -2.0, bestP = P;
+        for (double q = P * 0.97; q <= P * 1.03; q += P * 0.002)
+            if (c0 + (int) (2.0 * q) + 2 < n)
+            {
+                const double c = corr (c0, q);
+                if (c > bestC) { bestC = c; bestP = q; }
+            }
+        if (bestC > 0.5)
+            P = bestP;
+
+        // alignement de phase : premier passage montant par zéro
+        int st = c0;
+        for (int i = c0; i < c0 + (int) P && i + 1 < n; ++i)
+            if (x[(size_t) i] <= 0.0f && x[(size_t) (i + 1)] > 0.0f) { st = i; break; }
+
+        float* out = frames.data() + (size_t) f * N;
+        double mean = 0.0;
+        for (int i = 0; i < N; ++i)
+        {
+            const double pos = (double) st + (double) i * P / N;
+            const int i0 = juce::jlimit (0, n - 2, (int) pos);
+            const float fr = (float) (pos - i0);
+            out[i] = x[(size_t) i0] + (x[(size_t) (i0 + 1)] - x[(size_t) i0]) * fr;
+            mean += out[i];
+        }
+        mean /= N;
+        for (int i = 0; i < N; ++i)
+        {
+            out[i] -= (float) mean;
+            maxAbs = juce::jmax (maxAbs, std::abs (out[i]));
+        }
+    }
+
+    for (auto& v : frames)
+        v *= 0.9f / maxAbs;
+
+    // on écrit un .wav (32 formes d'onde de 2048) : il se recharge avec le preset et se réutilise ailleurs
+    auto dir = getPresetDirectory().getParentDirectory().getChildFile ("Resampled");
+    dir.createDirectory();
+    const auto file = dir.getNonexistentChildFile ("resample", ".wav");
+
+    {
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::FileOutputStream> stream (file.createOutputStream());
+        if (stream == nullptr)
+        {
+            error = "RESAMPLE : ECRITURE IMPOSSIBLE";
+            return false;
+        }
+        std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream.get(), 44100.0, 1, 24, {}, 0));
+        if (writer == nullptr)
+        {
+            error = "RESAMPLE : ECRITURE IMPOSSIBLE";
+            return false;
+        }
+        stream.release();
+        juce::AudioBuffer<float> out (1, F * N);
+        out.copyFrom (0, 0, frames.data(), F * N);
+        writer->writeFromAudioSampleBuffer (out, 0, F * N);
+    }
+
+    return loadUserWavetable (slot, file, error);
 }
 
 juce::String MonSyntheProcessor::getUserTableName (int slot) const

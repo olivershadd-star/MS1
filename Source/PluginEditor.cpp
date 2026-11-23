@@ -818,6 +818,10 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     styleButton (importBButton, 2);
     importAButton.onClick = [this] { importWavetable (0); };
     importBButton.onClick = [this] { importWavetable (1); };
+    styleButton (resampleAButton, 4);
+    styleButton (resampleBButton, 4);
+    resampleAButton.onClick = [this] { startResample (0); };
+    resampleBButton.onClick = [this] { startResample (1); };
 
     // --- Visuels et couleur centrale
     addAndMakeVisible (headerSpectrum);
@@ -902,6 +906,8 @@ void MonSyntheEditor::updateMenuVisibility()
     tableB.box.setVisible (currentMenu == mOscB);
     warpB.box.setVisible (currentMenu == mOscB);
     importBButton.setVisible (currentMenu == mOscB);
+    resampleAButton.setVisible (currentMenu == mOscA);
+    resampleBButton.setVisible (currentMenu == mOscB);
     filterType.box.setVisible (currentMenu == mFilter);
     lfoShape.box.setVisible (currentMenu == mLfo);
     lfoSync.box.setVisible (currentMenu == mLfo);
@@ -1146,8 +1152,10 @@ void MonSyntheEditor::resized()
 
         if (s == 0)
         {
-            tableA.box.setBounds (first);       warpA.box.setBounds (second);       importAButton.setBounds (third);
-            tableB.box.setBounds (first);       warpB.box.setBounds (second);       importBButton.setBounds (third);
+            const auto t1 = third.withWidth (third.getWidth() / 2 - S (2.0f));
+            const auto t2 = third.withTrimmedLeft (third.getWidth() / 2);
+            tableA.box.setBounds (first);       warpA.box.setBounds (second);       importAButton.setBounds (t1);  resampleAButton.setBounds (t2);
+            tableB.box.setBounds (first);       warpB.box.setBounds (second);       importBButton.setBounds (t1);  resampleBButton.setBounds (t2);
             filterType.box.setBounds (first);
             lfoShape.box.setBounds (first);     lfoSync.box.setBounds (second);
             lfo3Shape.box.setBounds (first);    lfo3Sync.box.setBounds (second);
@@ -1259,6 +1267,31 @@ void MonSyntheEditor::timerCallback()
         peak = juce::jmax (peak, std::abs (v));
     const float level = juce::jlimit (0.0f, 1.0f, (juce::Decibels::gainToDecibels (peak, -60.0f) + 60.0f) / 60.0f);
     outLevel = level > outLevel ? level : outLevel * 0.9f;
+
+    if (resampleSlot >= 0)
+    {
+        const int st = proc.getResampleState();
+        if (st == 2)
+        {
+            juce::String error;
+            const int slot = resampleSlot;
+            resampleSlot = -1;
+            if (proc.finishResample (slot, error))
+            {
+                auto& box = slot == 0 ? tableA.box : tableB.box;
+                box.setSelectedItemIndex (WavetableBank::numTables + slot, juce::sendNotificationSync);
+                statusMessage = "RESAMPLE -> USER " + juce::String (slot + 1) + " : 32 formes d'onde";
+            }
+            else
+                statusMessage = error;
+            statusFrames = 150;
+        }
+        else if (st == 1)
+        {
+            statusMessage = "RESAMPLE : JOUE ET TIENS UNE NOTE...  " + juce::String (juce::roundToInt (proc.getResampleProgress() * 100.0f)) + "%";
+            statusFrames = 5;
+        }
+    }
 
     updateLeds();
     if (currentMenu == mRack)
@@ -3025,4 +3058,12 @@ void MonSyntheEditor::swapRackSlots (int s)
     }
     refreshRack();
     repaint();
+}
+
+void MonSyntheEditor::startResample (int slot)
+{
+    resampleSlot = slot;
+    proc.startResample();
+    statusMessage = "RESAMPLE : JOUE ET TIENS UNE NOTE...";
+    statusFrames = 30;
 }
