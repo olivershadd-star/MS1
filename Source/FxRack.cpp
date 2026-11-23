@@ -177,6 +177,8 @@ FxRack::FxRack()
         slots.push_back (std::make_unique<Slot>());
 }
 
+FxRack::~FxRack() = default;
+
 void FxRack::prepare (double sampleRate, int maxBlockSize)
 {
     sr = sampleRate > 0.0 ? sampleRate : 44100.0;

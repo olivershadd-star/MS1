@@ -23,6 +23,7 @@ public:
     static constexpr int numSlots = 4;
 
     FxRack();
+    ~FxRack();
 
     void prepare (double sampleRate, int maxBlockSize);
     void reset();
