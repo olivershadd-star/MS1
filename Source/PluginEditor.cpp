@@ -497,6 +497,7 @@ const MonSyntheEditor::MenuDef& MonSyntheEditor::menuAt (int index)
                                                     { "compAttack", "ATTAQUE" }, { "compRelease", "RELEASE" },
                                                     { "compMakeup", "MAKEUP" }, { "compMix", "MIX" },
                                                     { "limCeil", "LIMITEUR" }, { "width", "LARGEUR" } } },
+        { "RACK FX",   2, VizNone, VizNone,       {} },
         { "MATRICE",   4, VizMatrix, VizMatrix,   {} }
     };
     return defs[juce::jlimit (0, numMenus - 1, index)];
@@ -625,6 +626,8 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     eqTypeBox.setColour (juce::ComboBox::textColourId, Pal::text);
     comboRefs.push_back ({ &eqTypeBox, 0 });
     addAndMakeVisible (eqTypeBox);
+
+    setupRack();
 
     // --- Matrice
     for (int i = 0; i < 12; ++i)
@@ -914,6 +917,16 @@ void MonSyntheEditor::updateMenuVisibility()
     noiseType.box.setVisible (currentMenu == mNoise);
     for (auto& b : eqBandButtons)
         b.setVisible (currentMenu == mEq);
+    for (auto& r : rack)
+    {
+        const bool v = currentMenu == mRack;
+        r.onBtn.setVisible (v);  r.leftBtn.setVisible (v);  r.rightBtn.setVisible (v);  r.typeBox.setVisible (v);
+        for (auto* k : r.k)
+        {
+            k->slider.setVisible (v);
+            k->label.setVisible (v);
+        }
+    }
     eqOnButton.setVisible (currentMenu == mEq);
     eqTypeBox.setVisible (currentMenu == mEq);
     phaseMode.box.setVisible (currentMenu == mPitch);
@@ -1028,6 +1041,15 @@ void MonSyntheEditor::updateLeds()
                     if (pv (("eq" + juce::String (b) + "On").toRawUTF8()) > 0.5f)
                         ++on;
                 lvl = on > 0 ? 0.5f + 0.5f * (float) on / 8.0f : 0.12f;
+                break;
+            }
+            case mRack:
+            {
+                int on = 0;
+                for (int s = 1; s <= 4; ++s)
+                    if (pv (("fx" + juce::String (s) + "Type").toRawUTF8()) > 0.5f && pv (("fx" + juce::String (s) + "On").toRawUTF8()) > 0.5f)
+                        ++on;
+                lvl = on > 0 ? 0.4f + 0.6f * (float) on / 4.0f : 0.12f;
                 break;
             }
             case mMaster: lvl = pv ("compThresh") < -0.1f ? 0.4f + 0.6f * pulse (3.0, 0.0) : (active ? 0.7f : 0.12f);  break;
@@ -1155,6 +1177,23 @@ void MonSyntheEditor::resized()
     eqOnButton.setBounds (R (632, 384, 160, 34));
     eqTypeBox.setBounds (R (632, 430, 160, 30));
 
+    // Rack : 4 colonnes sur les deux écrans
+    for (int s = 0; s < 4; ++s)
+    {
+        auto& r = rack[(size_t) s];
+        const int x = 194 + s * 204, w = 196;
+        r.area = R (x, 92, w, 436);
+        r.onBtn.setBounds (R (x + 6, 114, 84, 26));
+        r.leftBtn.setBounds (R (x + 96, 114, 44, 26));
+        r.rightBtn.setBounds (R (x + 146, 114, 44, 26));
+        r.typeBox.setBounds (R (x + 6, 146, w - 12, 28));
+        placeKnob (r.k[0], R (x + 4, 182, 94, 98));
+        placeKnob (r.k[1], R (x + 98, 182, 94, 98));
+        placeKnob (r.k[2], R (x + 4, 284, 94, 98));
+        placeKnob (r.k[3], R (x + 98, 284, 94, 98));
+        placeKnob (r.k[4], R (x + 6, 392, w - 12, 28));
+    }
+
     // Matrice (occupe les deux écrans)
     matrixArea = R (194, 92, 808, 436);
     {
@@ -1222,6 +1261,8 @@ void MonSyntheEditor::timerCallback()
     outLevel = level > outLevel ? level : outLevel * 0.9f;
 
     updateLeds();
+    if (currentMenu == mRack)
+        refreshRack();
 
     if (statusFrames > 0)
         --statusFrames;
@@ -1468,6 +1509,35 @@ void MonSyntheEditor::paint (juce::Graphics& g)
             g.drawHorizontalLine (matrixArea.getY() + S (26.0f) + (i + 1) * S (34.0f) - S (2.0f),
                                   (float) matrixArea.getX(), (float) matrixArea.getRight());
             g.setColour (Pal::dim);
+        }
+    }
+    else if (currentMenu == mRack)
+    {
+        drawPanel (g, screenAPanel.getUnion (screenBPanel),
+                   "RACK FX   //   4 effets en serie, juste avant le master   -   < > : echanger avec le voisin",
+                   Pal::role (menuAt (currentMenu).role));
+        for (int s = 0; s < 4; ++s)
+        {
+            const auto& r = rack[(size_t) s];
+            const auto col = Pal::role ((s + 1) % 6);
+            const bool active = (int) pv (("fx" + juce::String (s + 1) + "Type").toRawUTF8()) != 0
+                                && pv (("fx" + juce::String (s + 1) + "On").toRawUTF8()) > 0.5f;
+            g.setColour (Pal::bg.withAlpha (0.55f));
+            g.fillRect (r.area);
+            g.setColour (active ? col.withAlpha (0.8f) : Pal::line);
+            g.drawRect (r.area, juce::jmax (1, S (1.0f)));
+            g.setColour (col);
+            g.fillRect (r.area.getX(), r.area.getY(), r.area.getWidth(), S (3.0f));
+            g.setFont (Pal::mono (12.0f * scale, true));
+            g.drawText ("FX " + juce::String (s + 1), r.area.getX() + S (8.0f), r.area.getY() + S (6.0f), S (80.0f), S (18.0f),
+                        juce::Justification::centredLeft, false);
+            g.setColour (Pal::dim);
+            g.setFont (Pal::mono (9.0f * scale));
+            g.drawText (active ? "ACTIF" : "BYPASS", r.area.getRight() - S (88.0f), r.area.getY() + S (6.0f), S (80.0f), S (18.0f),
+                        juce::Justification::centredRight, false);
+            if (s < 3)
+                g.drawText (">", r.area.getRight() - S (2.0f), r.area.getCentreY() - S (8.0f), S (12.0f), S (16.0f),
+                            juce::Justification::centred, false);
         }
     }
     else if (currentMenu == mEq)
@@ -2571,7 +2641,7 @@ void MonSyntheEditor::showModMenu (Knob& knob)
 // Anneaux de modulation : la zone colorée autour du potard montre l'amplitude de chaque route
 void MonSyntheEditor::paintOverChildren (juce::Graphics& g)
 {
-    if (currentMenu == matrixMenu || currentMenu == mEq)
+    if (currentMenu == matrixMenu || currentMenu == mEq || currentMenu == mRack)
         return;
 
     for (auto* k : fixedKnobs)
@@ -2849,4 +2919,110 @@ void MonSyntheEditor::drawStringViz (juce::Graphics& g, juce::Rectangle<float> r
     g.setFont (Pal::mono (10.0f * scale));
     g.drawText ("CORDE PINCEE   duree " + juce::String (decay, 1) + " s", (int) area.getX(), (int) (r.getY() + 4.0f * scale),
                 (int) area.getWidth(), (int) (14.0f * scale), juce::Justification::centredLeft, false);
+}
+
+
+//==============================================================================
+// Rack d'effets
+//==============================================================================
+void MonSyntheEditor::setupRack()
+{
+    for (int s = 0; s < 4; ++s)
+    {
+        auto& r = rack[(size_t) s];
+        const juce::String n = "fx" + juce::String (s + 1);
+        const int role = (s + 1) % 6;
+
+        styleButton (r.onBtn, role);
+        r.onBtn.setClickingTogglesState (true);
+        r.onAtt = std::make_unique<APVTS::ButtonAttachment> (proc.apvts, n + "On", r.onBtn);
+
+        styleButton (r.leftBtn, role);
+        styleButton (r.rightBtn, role);
+        r.leftBtn.setEnabled (s > 0);
+        r.rightBtn.setEnabled (s < 3);
+        r.leftBtn.onClick = [this, s] { swapRackSlots (s - 1); };
+        r.rightBtn.onClick = [this, s] { swapRackSlots (s); };
+
+        // Le type est géré à la main : un changement fait par l'utilisateur remet les réglages par défaut du type,
+        // alors qu'un changement venant d'un preset ou de l'hôte n'y touche pas.
+        r.typeBox.addItemList (FxRack::typeNames(), 1);
+        r.typeBox.setColour (juce::ComboBox::arrowColourId, Pal::role (role));
+        r.typeBox.setColour (juce::ComboBox::textColourId, Pal::text);
+        comboRefs.push_back ({ &r.typeBox, role });
+        addAndMakeVisible (r.typeBox);
+        r.typeBox.onChange = [this, s]
+        {
+            auto& rs = rack[(size_t) s];
+            const int type = rs.typeBox.getSelectedItemIndex();
+            const juce::String id = "fx" + juce::String (s + 1);
+            if (type < 0 || type == (int) paramPlain (id + "Type"))
+                return;
+            setParamPlain (id + "Type", (float) type);
+            const char* ks[4] = { "A", "B", "C", "D" };
+            for (int k = 0; k < 4; ++k)
+                setParamPlain (id + ks[k], FxRack::defaultValue (type, k));
+            setParamPlain (id + "Mix", FxRack::defaultMix (type));
+            setParamPlain (id + "On", 1.0f);
+            refreshRack();
+        };
+
+        const char* ks[4] = { "A", "B", "C", "D" };
+        for (int k = 0; k < 4; ++k)
+        {
+            r.k[(size_t) k] = makeKnob (n + ks[k], ks[k], role);
+            r.k[(size_t) k]->slider.textFromValueFunction = [this, s, k] (double v)
+            {
+                return FxRack::valueText ((int) paramPlain ("fx" + juce::String (s + 1) + "Type"), k, (float) v);
+            };
+        }
+        r.k[4] = makeKnob (n + "Mix", "MIX", role, true);
+        r.k[4]->slider.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v * 100.0)) + "%"; };
+    }
+    refreshRack();
+}
+
+void MonSyntheEditor::refreshRack()
+{
+    for (int s = 0; s < 4; ++s)
+    {
+        auto& r = rack[(size_t) s];
+        const int type = (int) paramPlain ("fx" + juce::String (s + 1) + "Type");
+
+        if (r.typeBox.getSelectedItemIndex() != type)
+            r.typeBox.setSelectedItemIndex (type, juce::dontSendNotification);
+
+        if (type == r.shownType)
+            continue;
+        r.shownType = type;
+
+        for (int k = 0; k < 4; ++k)
+        {
+            const auto text = FxRack::label (type, k);
+            const bool used = text != "-";
+            r.k[(size_t) k]->label.setText (used ? text : juce::String(), juce::dontSendNotification);
+            r.k[(size_t) k]->slider.setEnabled (used);
+            r.k[(size_t) k]->slider.setAlpha (used ? 1.0f : 0.25f);
+            r.k[(size_t) k]->slider.updateText();
+        }
+        r.k[4]->slider.setEnabled (type != 0);
+        r.k[4]->slider.setAlpha (type != 0 ? 1.0f : 0.25f);
+        r.onBtn.setEnabled (type != 0);
+    }
+}
+
+void MonSyntheEditor::swapRackSlots (int s)
+{
+    if (s < 0 || s > 2)
+        return;
+    const char* ids[7] = { "Type", "On", "Mix", "A", "B", "C", "D" };
+    const juce::String a = "fx" + juce::String (s + 1), b = "fx" + juce::String (s + 2);
+    for (auto* id : ids)
+    {
+        const float va = paramPlain (a + id), vb = paramPlain (b + id);
+        setParamPlain (a + id, vb);
+        setParamPlain (b + id, va);
+    }
+    refreshRack();
+    repaint();
 }

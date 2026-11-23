@@ -1166,6 +1166,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
         addFloat ("eqOut", "EQ Sortie (dB)", NormalisableRange<float> (-12.0f, 12.0f), 0.0f);
     }
 
+    // Rack d'effets : 4 emplacements
+    for (int s = 1; s <= 4; ++s)
+    {
+        const String n = "fx" + String (s);
+        const String nm = "FX " + String (s) + " ";
+        addChoice ((n + "Type").toRawUTF8(), (nm + "Type").toRawUTF8(), FxRack::typeNames(), 0);
+        addBool   ((n + "On").toRawUTF8(), (nm + "On").toRawUTF8(), true);
+        addFloat  ((n + "Mix").toRawUTF8(), (nm + "Mix").toRawUTF8(), NormalisableRange<float> (0.0f, 1.0f), 0.5f);
+        const char* ks[4] = { "A", "B", "C", "D" };
+        for (auto* k : ks)
+            addFloat ((n + k).toRawUTF8(), (nm + k).toRawUTF8(), NormalisableRange<float> (0.0f, 1.0f), 0.5f);
+    }
+
     // Gain de voix et page MASTER (compresseur, limiteur, largeur)
     addFloat ("voiceGain", "Gain de voix (dB)", NormalisableRange<float> (-12.0f, 12.0f), 0.0f);
     addFloat ("compThresh",  "Comp Seuil (dB)", NormalisableRange<float> (-40.0f, 0.0f), 0.0f);
@@ -1275,6 +1288,14 @@ MonSyntheProcessor::MonSyntheProcessor()
     }
     eqOutParam = apvts.getRawParameterValue ("eqOut");
 
+    for (int s = 0; s < 4; ++s)
+    {
+        const juce::String n = "fx" + juce::String (s + 1);
+        const char* ids[7] = { "Type", "On", "Mix", "A", "B", "C", "D" };
+        for (int k = 0; k < 7; ++k)
+            fxParams[(size_t) (s * 7 + k)] = apvts.getRawParameterValue (n + ids[k]);
+    }
+
     synth.addSound (new SynthSound());
     for (int i = 0; i < 8; ++i)               // 8 voix de polyphonie
         synth.addVoice (new SynthVoice (apvts, bank, modWheel, hostBpm));
@@ -1316,6 +1337,8 @@ void MonSyntheProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
         band.lastType = -1;
     }
     lastEqOut = 1.0f;
+
+    fxRack.prepare (sampleRate, juce::jmax (samplesPerBlock, 8192));
 
     compressor.prepare (spec);
     limiter.prepare (spec);
@@ -1364,6 +1387,9 @@ void MonSyntheProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     synth.setMono (param ("mono") > 0.5f);
     keyboardState.processNextMidiBuffer (midi, 0, numSamples, true);
     generateSequencerMidi (midi, numSamples);
+    for (const auto meta : midi)
+        if (meta.getMessage().isNoteOn())
+            lastNoteHz = (float) juce::MidiMessage::getMidiNoteInHertz (meta.getMessage().getNoteNumber());
     synth.renderNextBlock (buffer, midi, 0, numSamples);
 
     applyEffects (buffer);
@@ -1597,6 +1623,27 @@ void MonSyntheProcessor::applyEffects (juce::AudioBuffer<float>& buffer)
         if (any || std::abs (eqOutGain - 1.0f) > 0.001f || std::abs (lastEqOut - 1.0f) > 0.001f)
             buffer.applyGainRamp (0, numSamples, lastEqOut, eqOutGain);
         lastEqOut = eqOutGain;
+    }
+
+    // RACK D'EFFETS (4 emplacements en série)
+    if (numCh == 2)
+    {
+        std::array<FxSlotParams, FxRack::numSlots> sp;
+        bool anyFx = false;
+        for (int s = 0; s < FxRack::numSlots; ++s)
+        {
+            auto& q = sp[(size_t) s];
+            q.type = (int) fxParams[(size_t) (s * 7)]->load();
+            q.on   = fxParams[(size_t) (s * 7 + 1)]->load() > 0.5f;
+            q.mix  = fxParams[(size_t) (s * 7 + 2)]->load();
+            q.a = fxParams[(size_t) (s * 7 + 3)]->load();
+            q.b = fxParams[(size_t) (s * 7 + 4)]->load();
+            q.c = fxParams[(size_t) (s * 7 + 5)]->load();
+            q.d = fxParams[(size_t) (s * 7 + 6)]->load();
+            anyFx = anyFx || (q.type != 0 && q.on);
+        }
+        if (anyFx)
+            fxRack.process (buffer, sp, hostBpm.load(), hostPlaying.load() ? hostPpq.load() : -1.0, lastNoteHz.load());
     }
 
     // MASTER : compresseur (mix parallèle), largeur stéréo

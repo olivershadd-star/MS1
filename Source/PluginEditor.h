@@ -317,9 +317,9 @@ private:
 
     // L'interface est dessinée pour 1280 x 720 puis mise à l'échelle (fenêtre redimensionnable, 16:9)
     static constexpr int baseWidth = 1280, baseHeight = 720;
-    static constexpr int numMenus = 21, matrixMenu = 20;
+    static constexpr int numMenus = 22, matrixMenu = 21;
     enum MenuId { mOscA = 0, mOscB, mFmRing, mUnison, mNoise, mString, mPitch, mFilter, mDisto, mEnvAmp, mEnvMod,
-                  mLfo, mLfo34, mJeu, mChorus, mPhaser, mDelay, mReverb, mEq, mMaster, mMatrix };
+                  mLfo, mLfo34, mJeu, mChorus, mPhaser, mDelay, mReverb, mEq, mMaster, mRack, mMatrix };
 
     static const MenuDef& menuAt (int index);
 
@@ -445,6 +445,21 @@ private:
     juce::Rectangle<int> eqGraphArea;
     int eqBand = 2;
     int eqDragBand = -1;
+
+    // Rack d'effets (4 emplacements)
+    struct RackSlotUi
+    {
+        juce::TextButton onBtn { "ON" }, leftBtn { "<" }, rightBtn { ">" };
+        juce::ComboBox typeBox;
+        std::unique_ptr<APVTS::ButtonAttachment> onAtt;
+        std::array<Knob*, 5> k {};            // A, B, C, D, MIX
+        int shownType = -1;
+        juce::Rectangle<int> area;
+    };
+    std::array<RackSlotUi, 4> rack;
+    void setupRack();
+    void refreshRack();
+    void swapRackSlots (int s);
 
     // Mise à jour des couleurs
     std::vector<ComboRef> comboRefs;

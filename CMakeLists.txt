@@ -23,7 +23,9 @@ target_sources(MS1 PRIVATE
     Source/PluginEditor.h
     Source/PluginEditor.cpp
     Source/FactoryBank.h
-    Source/FactoryBank.cpp)
+    Source/FactoryBank.cpp
+    Source/FxRack.h
+    Source/FxRack.cpp)
 
 target_compile_definitions(MS1 PUBLIC
     JUCE_WEB_BROWSER=0

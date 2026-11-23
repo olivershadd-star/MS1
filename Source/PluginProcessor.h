@@ -2,6 +2,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_dsp/juce_dsp.h>
 #include <array>
+#include "FxRack.h"
 
 // Déformation de la phase d'un oscillateur ("warp") :
 // 0 OFF, 1 BEND+, 2 BEND-, 3 SYNC, 4 MIRROR, 5 ASYM, 6 FLIP, 7 QUANT, 8 PWM, 9 WOBBLE
@@ -387,6 +388,11 @@ private:
     std::array<std::atomic<float>*, 40> eqParams {};      // par bande : on, type, freq, gain, Q
     std::atomic<float>* eqOutParam = nullptr;
     float lastEqOut = 1.0f;
+
+    // Rack d'effets (4 emplacements, juste avant le master)
+    FxRack fxRack;
+    std::array<std::atomic<float>*, 4 * 7> fxParams {};   // par emplacement : type, on, mix, a, b, c, d
+    std::atomic<float> lastNoteHz { 0.0f };
 
     juce::String userTableNames[WavetableBank::numUserTables];
     juce::String userTablePaths[WavetableBank::numUserTables];
