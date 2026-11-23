@@ -463,6 +463,33 @@ void SynthVoice::startNote (int midiNote, float vel, juce::SynthesiserSound*, in
         b.fill (0.0f);
     combPos = 0;
 
+    // Corde pincee : on remplit la boucle avec une salve de bruit, filtree (brillance) puis peignee (position du pincement)
+    strWrite = 0;
+    strPrev = 0.0f;
+    strBuf.fill (0.0f);
+    if (param ("strLevel") > 0.001f && sr > 0.0)
+    {
+        const double f0 = 440.0 * std::pow (2.0, (currentNote - 69.0) / 12.0 + (double) param ("strTune") / 1200.0);
+        const int n = juce::jlimit (4, strSize - 4, (int) std::ceil (sr / f0) + 2);
+        const float bright = juce::jlimit (0.03f, 1.0f, param ("strBright") * (0.4f + 0.8f * velocity));
+        float lp = 0.0f;
+        for (int i = 0; i < n; ++i)
+        {
+            lp += bright * ((rng.nextFloat() * 2.0f - 1.0f) - lp);
+            strBuf[(size_t) i] = lp;
+        }
+        const int k = juce::jlimit (0, n - 1, (int) std::lround (param ("strPos") * 0.5f * (float) n));
+        if (k > 0)
+            for (int i = n - 1; i >= k; --i)
+                strBuf[(size_t) i] -= strBuf[(size_t) (i - k)];
+        float peak = 0.0001f;
+        for (int i = 0; i < n; ++i)
+            peak = juce::jmax (peak, std::abs (strBuf[(size_t) i]));
+        for (int i = 0; i < n; ++i)
+            strBuf[(size_t) i] *= 0.8f / peak;
+        strWrite = n;
+    }
+
     position.setCurrentAndTargetValue (param ("position"));
     filter.reset();
     filter2.reset();
@@ -613,7 +640,6 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     const float detune = param ("detune");
     const float spread = param ("spread");
     const float norm   = 1.0f / std::sqrt ((float) uni);
-    const float uniBlend = param ("uniBlend");
 
     std::array<float, maxUnison> offsets {};
     std::array<float, maxUnison> gainL {}, gainR {};
@@ -635,8 +661,13 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     const float  levelB  = param ("oscBLevel");
     const float  posB    = param ("oscBPos");
     const double factorA = std::pow (2.0, std::round ((double) param ("oscAOct")) + (double) param ("oscATune") / 1200.0);
+    const float  uniBlend = param ("uniBlend");
     const double factorB = std::pow (2.0, std::round ((double) param ("oscBOct")) + (double) param ("oscBTune") / 1200.0);
     const float  subAmt  = param ("subLevel");
+    const float  strAmt  = param ("strLevel");
+    const float  strDecaySec = param ("strDecay");
+    const float  strA = 0.5f + 0.5f * param ("strDamp");
+    const double strFactor = std::pow (2.0, (double) param ("strTune") / 1200.0);
 
     // --- Warp, FM, ring
     const int   warpModeA  = (int) param ("warpModeA");
@@ -676,6 +707,12 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
             incB[k] = freqB / sr * ratio;
         }
         incSub = freqBase / sr * 0.5;                              // sub : une octave en dessous
+        if (strAmt > 0.001f)
+        {
+            const double fs = freqBase * strFactor;
+            strDelay = (float) juce::jlimit (2.0, (double) (strSize - 4), sr / fs - 0.5);
+            strGain = std::exp (-6.9078f / juce::jmax (0.05f, strDecaySec * (float) fs));    // -60 dB apres strDecaySec
+        }
 
         const double maxRatio = std::pow (2.0, (double) detuneNow / 1200.0);
         mipA = WavetableBank::levelForFrequency (freq * maxRatio);
@@ -795,6 +832,23 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         phaseSub += incSub;
         if (phaseSub >= 1.0)
             phaseSub -= 1.0;
+
+        // Corde pincee : ligne a retard + filtre passe-bas dans la boucle
+        if (strAmt > 0.001f)
+        {
+            const float rp = (float) strWrite - strDelay;
+            const int i0 = (int) std::floor (rp);
+            const float fr = rp - (float) i0;
+            const float s = strBuf[(size_t) (i0 & (strSize - 1))] * (1.0f - fr)
+                          + strBuf[(size_t) ((i0 + 1) & (strSize - 1))] * fr;
+            const float filtered = strA * s + (1.0f - strA) * strPrev;
+            strPrev = s;
+            const float y = filtered * strGain * (keyDown ? 1.0f : 0.995f);
+            strBuf[(size_t) (strWrite & (strSize - 1))] = y;
+            ++strWrite;
+            l += y * strAmt;
+            r += y * strAmt;
+        }
 
         // Bruit (avec sa propre enveloppe de decay)
         const float nLevel = juce::jlimit (0.0f, 1.0f, noiseLevel + tgt[19]);
@@ -1027,6 +1081,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addFloat ("oscBLevel", "B Niveau", unit, 0.0f);
     addFloat ("oscBPhase", "B Phase", unit, 0.0f);
     addFloat ("subLevel",  "Sub Niveau", unit, 0.0f);
+    addFloat ("strLevel",  "Corde Niveau", unit, 0.0f);
+    addFloat ("strDecay",  "Corde Duree (s)", NormalisableRange<float> (0.1f, 12.0f, 0.0f, 0.4f), 2.0f);
+    addFloat ("strDamp",   "Corde Amorti", unit, 0.6f);
+    addFloat ("strPos",    "Corde Position pincage", unit, 0.3f);
+    addFloat ("strBright", "Corde Brillance", unit, 0.7f);
+    addFloat ("strTune",   "Corde Accord (cents)", NormalisableRange<float> (-100.0f, 100.0f), 0.0f);
 
     // Warp, FM et ring : de quoi travailler le son bien plus loin
     addChoice ("warpModeA", "Warp A Mode", warpModeNames(), 0);

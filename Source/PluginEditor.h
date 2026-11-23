@@ -277,6 +277,7 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
     void paintOverChildren (juce::Graphics&) override;
+    void showModMenu (Knob& knob);
     static int modTargetForParam (const juce::String& id);
 
     // EQ : on attrape les points du graphique à la souris
@@ -302,11 +303,10 @@ private:
         bool linear = false;
         juce::String paramId;      // paramètre actuellement relié (pour la modulation par clic droit)
     };
-    void showModMenu (Knob& knob);
 
     enum Viz { VizNone = 0, VizScopeA, VizUnison, VizScopeB, VizFmRing, VizFilter,
                VizEnvFilter, VizEnvAmp, VizEnvMod, VizLfo1, VizLfo2, VizLfo3, VizLfo4, VizGlide,
-               VizChorus, VizDelay, VizReverb, VizMatrix, VizSpectrum, VizNoise, VizPitch, VizDisto, VizComp };
+               VizChorus, VizDelay, VizReverb, VizMatrix, VizSpectrum, VizNoise, VizPitch, VizDisto, VizComp, VizString };
 
     struct ParamSlot { const char* id; const char* label; };
     struct MenuDef   { const char* name; int role; int vizA; int vizB; ParamSlot p[8]; };
@@ -317,8 +317,8 @@ private:
 
     // L'interface est dessinée pour 1280 x 720 puis mise à l'échelle (fenêtre redimensionnable, 16:9)
     static constexpr int baseWidth = 1280, baseHeight = 720;
-    static constexpr int numMenus = 20, matrixMenu = 19;
-    enum MenuId { mOscA = 0, mOscB, mFmRing, mUnison, mNoise, mPitch, mFilter, mDisto, mEnvAmp, mEnvMod,
+    static constexpr int numMenus = 21, matrixMenu = 20;
+    enum MenuId { mOscA = 0, mOscB, mFmRing, mUnison, mNoise, mString, mPitch, mFilter, mDisto, mEnvAmp, mEnvMod,
                   mLfo, mLfo34, mJeu, mChorus, mPhaser, mDelay, mReverb, mEq, mMaster, mMatrix };
 
     static const MenuDef& menuAt (int index);
@@ -362,6 +362,7 @@ private:
     void drawDelayViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
     void drawReverbViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
     void drawNoiseViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
+    void drawStringViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
     void drawPitchViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
     void drawDistoViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
     void drawCompViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);

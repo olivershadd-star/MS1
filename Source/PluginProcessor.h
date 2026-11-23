@@ -234,6 +234,13 @@ private:
     // Bruit, enveloppe de hauteur, distorsion
     struct NoiseGen { float b[7] {}; float lp = 0.0f; float held = 0.0f; int hold = 0; };
     std::array<NoiseGen, 2> noiseGen;
+    // Corde pincee (Karplus-Strong) : 3eme source, a cote de l'OSC A et de l'OSC B
+    static constexpr int strSize = 8192;
+    std::array<float, strSize> strBuf {};
+    int strWrite = 0;
+    float strPrev = 0.0f;
+    float strDelay = 100.0f;        // longueur de la boucle en echantillons (suit la hauteur)
+    float strGain = 0.99f;          // gain par passage dans la boucle (donne la duree)
     float pitchEnvVal = 1.0f;       // 1 -> 0 (décroissance exponentielle depuis le début de la note)
     float noiseEnvVal = 1.0f;
     std::array<float, 2> crushHeld {};

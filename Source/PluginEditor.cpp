@@ -453,6 +453,9 @@ const MonSyntheEditor::MenuDef& MonSyntheEditor::menuAt (int index)
                                                     { "spread", "STEREO" }, { "uniBlend", "BLEND" } } },
         { "BRUIT",     5, VizNoise, VizSpectrum,  { { "noiseLevel", "NIVEAU" }, { "noiseTone", "TON" },
                                                     { "noiseDecay", "DECAY" } } },
+        { "CORDE",     3, VizString, VizSpectrum, { { "strLevel", "NIVEAU" }, { "strDecay", "DUREE" },
+                                                    { "strDamp", "AMORTI" }, { "strPos", "PINCEMENT" },
+                                                    { "strBright", "BRILLANCE" }, { "strTune", "ACCORD" } } },
         { "PITCH",     0, VizPitch, VizScopeA,    { { "pitchEnvAmt", "QUANTITE" }, { "pitchEnvDecay", "DECAY" },
                                                     { "oscPhase", "PHASE" } } },
         { "FILTRE",    4, VizFilter, VizEnvFilter,{ { "cutoff", "CUTOFF" }, { "resonance", "RESO" },
@@ -991,6 +994,7 @@ void MonSyntheEditor::updateLeds()
         {
             case mOscA: case mOscB: case mFmRing: case mUnison:
                 lvl = active ? 0.35f + 0.65f * pulse (1.3 + 0.4 * i, i) : 0.12f;  break;
+            case mString: lvl = pv ("strLevel") > 0.01f ? 0.35f + 0.65f * pulse (2.0, 0.0) : 0.12f;  break;
             case mNoise:  lvl = pv ("noiseLevel") > 0.01f ? 0.3f + 0.7f * pulse (5.0, 0.0) : 0.12f;  break;
             case mPitch:  lvl = std::abs (pv ("pitchEnvAmt")) > 0.5f ? (active ? 1.0f : 0.6f) : 0.12f;  break;
             case mFilter: lvl = active ? 0.35f + 0.65f * pulse (2.1, 0.5) : 0.12f;     break;
@@ -1099,7 +1103,7 @@ void MonSyntheEditor::resized()
     // Menus
     menuPanel = R (8, 60, 168, 476);
     for (int i = 0; i < numMenus; ++i)
-        menuButtons[(size_t) i].setBounds (R (14 + (i % 2) * 78, 90 + (i / 2) * 44, 74, 38));
+        menuButtons[(size_t) i].setBounds (R (14 + (i % 2) * 78, 88 + (i / 2) * 40, 74, 36));
 
     // Écrans
     screenAPanel = R (184, 60, 410, 476);
@@ -1599,6 +1603,7 @@ void MonSyntheEditor::drawViz (juce::Graphics& g, int viz, juce::Rectangle<float
         case VizDelay:     drawDelayViz (g, r, colour);        break;
         case VizReverb:    drawReverbViz (g, r, colour);       break;
         case VizNoise:     drawNoiseViz (g, r, colour);        break;
+        case VizString:    drawStringViz (g, r, colour);       break;
         case VizPitch:     drawPitchViz (g, r, colour);        break;
         case VizDisto:     drawDistoViz (g, r, colour);        break;
         case VizComp:      drawCompViz (g, r, colour);         break;
@@ -1841,9 +1846,9 @@ void MonSyntheEditor::drawEnvelopeViz (juce::Graphics& g, juce::Rectangle<float>
 void MonSyntheEditor::drawLfoViz (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour colour, int which)
 {
     const juce::String pre = which == 0 ? juce::String ("lfo") : "lfo" + juce::String (which + 1);
-    const int shape = (int) pv ((pre + "Shape").toRawUTF8());
-    const float rate = pv ((pre + "Rate").toRawUTF8());
-    const int sync = (int) pv ((pre + "Sync").toRawUTF8());
+    const int shape = (int) pv (pre + "Shape");
+    const float rate = pv (pre + "Rate");
+    const int sync = (int) pv (pre + "Sync");
     const float depth = which != 0 ? 1.0f : juce::jmax (0.12f, pv ("lfoDepth"));
     const double bpm = proc.getHostBpm() > 1.0 ? proc.getHostBpm() : 120.0;
 
@@ -2815,4 +2820,33 @@ void PresetBrowser::listBoxItemClicked (int row, const juce::MouseEvent& e)
     list.repaint();
     if (onPick)
         onPick (entry.id);
+}
+
+void MonSyntheEditor::drawStringViz (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour colour)
+{
+    const float level = pv ("strLevel"), damp = pv ("strDamp"), pos = pv ("strPos"), decay = pv ("strDecay");
+    const auto area = r.reduced (10.0f * scale, 24.0f * scale);
+    const float cy = area.getCentreY();
+    const float amp = area.getHeight() * 0.38f * (0.25f + 0.75f * level);
+
+    g.setColour (Pal::line.brighter (0.3f).withAlpha (0.5f));
+    g.drawHorizontalLine ((int) cy, area.getX(), area.getRight());
+
+    // la corde au moment du pincement, puis ses vibrations qui s'estompent (plus de brillance = plus de pointes)
+    const float peakX = area.getX() + area.getWidth() * juce::jlimit (0.08f, 0.5f, 0.08f + pos * 0.42f);
+    for (int k = 0; k < 4; ++k)
+    {
+        const float a = amp * std::pow (0.45f + 0.4f * damp, (float) k) * (k % 2 == 0 ? 1.0f : -1.0f);
+        juce::Path p;
+        p.startNewSubPath (area.getX(), cy);
+        p.lineTo (peakX, cy - a);
+        p.lineTo (area.getRight(), cy);
+        g.setColour (colour.withAlpha (k == 0 ? 0.95f : 0.35f / (float) k));
+        g.strokePath (p, juce::PathStrokeType ((k == 0 ? 2.2f : 1.2f) * scale));
+    }
+
+    g.setColour (Pal::dim);
+    g.setFont (Pal::mono (10.0f * scale));
+    g.drawText ("CORDE PINCEE   duree " + juce::String (decay, 1) + " s", (int) area.getX(), (int) (r.getY() + 4.0f * scale),
+                (int) area.getWidth(), (int) (14.0f * scale), juce::Justification::centredLeft, false);
 }

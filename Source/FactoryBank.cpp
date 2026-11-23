@@ -146,6 +146,30 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.15f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
             { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 18.0f }, { "mx2Amt", 0.4f } } },
 
+        { "Basse Electrique", "BASSES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
+            { "strLevel", 1.0f }, { "attack", 0.001f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.15f },
+            { "filterType", 0.0f }, { "voiceGain", 3.0f }, { "mono", 1.0f }, { "glide", 0.0f }, { "strDecay", 1.8f },
+            { "strDamp", 0.55f }, { "strPos", 0.12f }, { "strBright", 0.5f }, { "cutoff", 3000.0f }, { "eq1On", 1.0f },
+            { "eq1Type", 0.0f }, { "eq1Freq", 35.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
+            { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 18.0f }, { "mx2Amt", 0.4f } } },
+
+        { "Basse Slap", "BASSES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
+            { "strLevel", 1.0f }, { "attack", 0.001f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.15f },
+            { "filterType", 0.0f }, { "voiceGain", 3.0f }, { "mono", 1.0f }, { "glide", 0.0f }, { "strDecay", 0.6f },
+            { "strDamp", 0.8f }, { "strPos", 0.06f }, { "strBright", 1.0f }, { "cutoff", 6000.0f }, { "eq1On", 1.0f },
+            { "eq1Type", 0.0f }, { "eq1Freq", 60.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
+            { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 18.0f }, { "mx2Amt", 0.4f } } },
+
+        { "Contrebasse Pizz", "BASSES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
+            { "strLevel", 1.0f }, { "attack", 0.001f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.15f },
+            { "filterType", 0.0f }, { "voiceGain", 3.0f }, { "mono", 1.0f }, { "glide", 0.0f }, { "strDecay", 1.2f },
+            { "strDamp", 0.35f }, { "strPos", 0.3f }, { "strBright", 0.3f }, { "cutoff", 2000.0f }, { "eq1On", 1.0f },
+            { "eq1Type", 0.0f }, { "eq1Freq", 35.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
+            { "mx1Amt", 0.5f } } },
+
         //======================================================================== ROBOTIQUE
         { "Voice Box", "ROBOTIQUE", {
             { "lfoDepth", 0.6f }, { "modAmount", 0.0f }, { "mono", 1.0f }, { "glide", 0.02f }, { "tableA", 1.0f },
@@ -1159,7 +1183,92 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "noiseDecay", 0.02f }, { "unison", 1.0f }, { "filterType", 3.0f }, { "cutoff", 2500.0f },
             { "resonance", 2.5f }, { "attack", 0.001f }, { "decay", 0.04f }, { "sustain", 0.0f }, { "release", 0.03f },
             { "voiceGain", 3.0f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f },
-            { "mx2Dst", 19.0f }, { "mx2Amt", 0.5f } } }
+            { "mx2Dst", 19.0f }, { "mx2Amt", 0.5f } } },
+
+        //======================================================================== GUITARES
+        { "Guitare Classique", "GUITARES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
+            { "strLevel", 1.0f }, { "attack", 0.001f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.15f },
+            { "filterType", 0.0f }, { "voiceGain", 3.0f }, { "strDecay", 2.2f }, { "strDamp", 0.35f },
+            { "strPos", 0.22f }, { "strBright", 0.45f }, { "cutoff", 5000.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f },
+            { "eq1Freq", 80.0f }, { "eq1Q", 0.71f }, { "eq2On", 1.0f }, { "eq2Type", 2.0f }, { "eq2Freq", 200.0f },
+            { "eq2Gain", 3.0f }, { "eq2Q", 1.0f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f },
+            { "mx2Src", 11.0f }, { "mx2Dst", 1.0f }, { "mx2Amt", 0.0f } } },
+
+        { "Guitare Folk", "GUITARES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
+            { "strLevel", 1.0f }, { "attack", 0.001f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.15f },
+            { "filterType", 0.0f }, { "voiceGain", 3.0f }, { "strDecay", 2.8f }, { "strDamp", 0.5f },
+            { "strPos", 0.18f }, { "strBright", 0.7f }, { "cutoff", 8000.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f },
+            { "eq1Freq", 80.0f }, { "eq1Q", 0.71f }, { "eq2On", 1.0f }, { "eq2Type", 2.0f }, { "eq2Freq", 3500.0f },
+            { "eq2Gain", 2.0f }, { "eq2Q", 0.9f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f } } },
+
+        { "Guitare Nylon", "GUITARES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
+            { "strLevel", 1.0f }, { "attack", 0.001f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.15f },
+            { "filterType", 0.0f }, { "voiceGain", 3.0f }, { "strDecay", 1.8f }, { "strDamp", 0.25f },
+            { "strPos", 0.25f }, { "strBright", 0.3f }, { "cutoff", 4000.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f },
+            { "eq1Freq", 80.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f } } },
+
+        { "Guitare Electrique", "GUITARES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
+            { "strLevel", 1.0f }, { "attack", 0.001f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.15f },
+            { "filterType", 0.0f }, { "voiceGain", 3.0f }, { "strDecay", 3.5f }, { "strDamp", 0.6f },
+            { "strPos", 0.12f }, { "strBright", 0.6f }, { "cutoff", 7000.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f },
+            { "eq1Freq", 90.0f }, { "eq1Q", 0.71f }, { "eq2On", 1.0f }, { "eq2Type", 2.0f }, { "eq2Freq", 2500.0f },
+            { "eq2Gain", 2.0f }, { "eq2Q", 1.0f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f },
+            { "mx2Src", 10.0f }, { "mx2Dst", 18.0f }, { "mx2Amt", 0.4f } } },
+
+        { "Guitare Etouffee", "GUITARES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
+            { "strLevel", 1.0f }, { "attack", 0.001f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.15f },
+            { "filterType", 0.0f }, { "voiceGain", 3.0f }, { "strDecay", 0.35f }, { "strDamp", 0.2f },
+            { "strPos", 0.15f }, { "strBright", 0.5f }, { "cutoff", 4500.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f },
+            { "eq1Freq", 100.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f } } },
+
+        { "Harpe", "GUITARES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
+            { "strLevel", 1.0f }, { "attack", 0.001f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.5f },
+            { "filterType", 0.0f }, { "voiceGain", 3.0f }, { "strDecay", 4.0f }, { "strDamp", 0.75f },
+            { "strPos", 0.35f }, { "strBright", 0.5f }, { "cutoff", 9000.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f },
+            { "eq1Freq", 60.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f } } },
+
+        { "Banjo", "GUITARES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
+            { "strLevel", 1.0f }, { "attack", 0.001f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.15f },
+            { "filterType", 0.0f }, { "voiceGain", 3.0f }, { "strDecay", 0.9f }, { "strDamp", 0.8f },
+            { "strPos", 0.1f }, { "strBright", 0.95f }, { "cutoff", 9000.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f },
+            { "eq1Freq", 200.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f } } },
+
+        { "Mandoline", "GUITARES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
+            { "strLevel", 1.0f }, { "attack", 0.001f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.15f },
+            { "filterType", 0.0f }, { "voiceGain", 3.0f }, { "strDecay", 1.1f }, { "strDamp", 0.7f },
+            { "strPos", 0.12f }, { "strBright", 0.8f }, { "cutoff", 9000.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f },
+            { "eq1Freq", 250.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f } } },
+
+        { "Koto", "GUITARES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
+            { "strLevel", 1.0f }, { "attack", 0.001f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.15f },
+            { "filterType", 0.0f }, { "voiceGain", 3.0f }, { "strDecay", 2.2f }, { "strDamp", 0.7f },
+            { "strPos", 0.08f }, { "strBright", 0.85f }, { "cutoff", 9000.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f },
+            { "eq1Freq", 150.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f } } },
+
+        { "Sitar Synth", "GUITARES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
+            { "strLevel", 1.0f }, { "attack", 0.001f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.15f },
+            { "filterType", 0.0f }, { "voiceGain", 3.0f }, { "strDecay", 2.5f }, { "strDamp", 1.0f },
+            { "strPos", 0.05f }, { "strBright", 1.0f }, { "cutoff", 9000.0f }, { "distType", 0.0f },
+            { "distAmt", 0.15f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f }, { "eq1Freq", 120.0f }, { "eq1Q", 0.71f },
+            { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 18.0f },
+            { "mx2Amt", 0.5f } } },
+
+        { "Corde Infinie", "GUITARES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
+            { "strLevel", 1.0f }, { "attack", 0.001f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 1.5f },
+            { "filterType", 0.0f }, { "voiceGain", 3.0f }, { "strDecay", 12.0f }, { "strDamp", 1.0f },
+            { "strPos", 0.3f }, { "strBright", 0.35f }, { "cutoff", 6000.0f }, { "reverbMix", 0.0f },
+            { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f } } }
     };
 
     return presets;
