@@ -1846,9 +1846,9 @@ void MonSyntheEditor::drawEnvelopeViz (juce::Graphics& g, juce::Rectangle<float>
 void MonSyntheEditor::drawLfoViz (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour colour, int which)
 {
     const juce::String pre = which == 0 ? juce::String ("lfo") : "lfo" + juce::String (which + 1);
-    const int shape = (int) pv (pre + "Shape");
-    const float rate = pv (pre + "Rate");
-    const int sync = (int) pv (pre + "Sync");
+    const int shape = (int) pv ((pre + "Shape").toRawUTF8());
+    const float rate = pv ((pre + "Rate").toRawUTF8());
+    const int sync = (int) pv ((pre + "Sync").toRawUTF8());
     const float depth = which != 0 ? 1.0f : juce::jmax (0.12f, pv ("lfoDepth"));
     const double bpm = proc.getHostBpm() > 1.0 ? proc.getHostBpm() : 120.0;
 

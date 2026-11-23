@@ -277,7 +277,6 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
     void paintOverChildren (juce::Graphics&) override;
-    void showModMenu (Knob& knob);
     static int modTargetForParam (const juce::String& id);
 
     // EQ : on attrape les points du graphique à la souris
@@ -303,6 +302,7 @@ private:
         bool linear = false;
         juce::String paramId;      // paramètre actuellement relié (pour la modulation par clic droit)
     };
+    void showModMenu (Knob& knob);
 
     enum Viz { VizNone = 0, VizScopeA, VizUnison, VizScopeB, VizFmRing, VizFilter,
                VizEnvFilter, VizEnvAmp, VizEnvMod, VizLfo1, VizLfo2, VizLfo3, VizLfo4, VizGlide,

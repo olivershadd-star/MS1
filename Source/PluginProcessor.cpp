@@ -640,6 +640,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     const float detune = param ("detune");
     const float spread = param ("spread");
     const float norm   = 1.0f / std::sqrt ((float) uni);
+    const float uniBlend = param ("uniBlend");
 
     std::array<float, maxUnison> offsets {};
     std::array<float, maxUnison> gainL {}, gainR {};
@@ -661,7 +662,6 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     const float  levelB  = param ("oscBLevel");
     const float  posB    = param ("oscBPos");
     const double factorA = std::pow (2.0, std::round ((double) param ("oscAOct")) + (double) param ("oscATune") / 1200.0);
-    const float  uniBlend = param ("uniBlend");
     const double factorB = std::pow (2.0, std::round ((double) param ("oscBOct")) + (double) param ("oscBTune") / 1200.0);
     const float  subAmt  = param ("subLevel");
     const float  strAmt  = param ("strLevel");
