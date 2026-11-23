@@ -695,6 +695,40 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "delayMix", 0.3f }, { "delayFeedback", 0.5f }, { "delayLP", 6000.0f }, { "mx1Src", 9.0f },
             { "mx1Dst", 16.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 14.0f }, { "mx2Amt", 0.5f } } },
 
+        { "Tubular Bells", "CLOCHES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "oscBPos", 0.0f },
+            { "oscBOct", 1.0f }, { "oscBTune", 30.0f }, { "ringAmount", 0.45f }, { "fmAmount", 0.15f },
+            { "unison", 1.0f }, { "filterType", 0.0f }, { "cutoff", 11000.0f }, { "attack", 0.001f },
+            { "decay", 3.0f }, { "sustain", 0.0f }, { "release", 2.5f }, { "voiceGain", 3.0f }, { "eq1On", 1.0f },
+            { "eq1Type", 0.0f }, { "eq1Freq", 120.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 17.0f },
+            { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 16.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Church Bell", "CLOCHES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "oscBPos", 0.0f },
+            { "oscBOct", 1.0f }, { "oscBTune", 12.0f }, { "ringAmount", 0.5f }, { "fmAmount", 0.25f },
+            { "modDecay", 1.5f }, { "modSustain", 0.0f }, { "unison", 1.0f }, { "filterType", 0.0f },
+            { "cutoff", 9000.0f }, { "attack", 0.001f }, { "decay", 4.5f }, { "sustain", 0.0f }, { "release", 4.0f },
+            { "voiceGain", 3.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f }, { "eq1Freq", 100.0f }, { "eq1Q", 0.71f },
+            { "mx1Src", 2.0f }, { "mx1Dst", 16.0f }, { "mx1Amt", 0.3f }, { "mx2Src", 9.0f }, { "mx2Dst", 17.0f },
+            { "mx2Amt", 0.5f }, { "mx3Src", 10.0f }, { "mx3Dst", 3.0f }, { "mx3Amt", 0.4f } } },
+
+        { "Gamelan", "CLOCHES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "oscBPos", 0.0f },
+            { "oscBOct", 1.0f }, { "oscBTune", -20.0f }, { "oscBLevel", 0.3f }, { "ringAmount", 0.55f },
+            { "unison", 2.0f }, { "detune", 25.0f }, { "filterType", 0.0f }, { "cutoff", 9000.0f },
+            { "attack", 0.001f }, { "decay", 1.8f }, { "sustain", 0.0f }, { "release", 1.2f }, { "voiceGain", 3.0f },
+            { "eq1On", 1.0f }, { "eq1Type", 0.0f }, { "eq1Freq", 120.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f },
+            { "mx1Dst", 17.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 6.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Steel Drum", "CLOCHES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.143f }, { "oscBPos", 0.0f },
+            { "oscBOct", 1.0f }, { "oscBLevel", 0.5f }, { "oscBTune", 6.0f }, { "fmAmount", 0.1f },
+            { "pitchEnvAmt", 2.0f }, { "pitchEnvDecay", 0.02f }, { "unison", 1.0f }, { "filterType", 0.0f },
+            { "cutoff", 5500.0f }, { "attack", 0.001f }, { "decay", 0.6f }, { "sustain", 0.0f }, { "release", 0.4f },
+            { "voiceGain", 3.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f }, { "eq1Freq", 100.0f }, { "eq1Q", 0.71f },
+            { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 7.0f },
+            { "mx2Amt", 0.5f } } },
+
         //======================================================================== CORDES
         { "Dark Strings", "CORDES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.55f }, { "unison", 6.0f },
@@ -709,6 +743,42 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "sustain", 1.0f }, { "release", 1.2f }, { "chorusMix", 0.5f }, { "phaserMix", 0.25f },
             { "phaserRate", 0.3f }, { "reverbMix", 0.3f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f },
             { "mx2Src", 10.0f }, { "mx2Dst", 6.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Ensemble Lent", "CORDES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.43f }, { "unison", 6.0f },
+            { "detune", 16.0f }, { "spread", 0.8f }, { "filterType", 0.0f }, { "cutoff", 3000.0f }, { "attack", 1.0f },
+            { "decay", 0.5f }, { "sustain", 1.0f }, { "release", 1.2f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
+            { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 6.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Ensemble Pizzicato", "CORDES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.43f }, { "unison", 4.0f },
+            { "detune", 10.0f }, { "spread", 0.7f }, { "filterType", 1.0f }, { "cutoff", 2200.0f },
+            { "fltEnvAmount", 0.4f }, { "fltDecay", 0.12f }, { "fltSustain", 0.0f }, { "attack", 0.001f },
+            { "decay", 0.25f }, { "sustain", 0.0f }, { "release", 0.12f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
+            { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 6.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Cordes Cinema", "CORDES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.5f }, { "unison", 7.0f }, { "detune", 22.0f },
+            { "spread", 1.0f }, { "filterType", 0.0f }, { "cutoff", 2500.0f }, { "attack", 1.5f }, { "decay", 0.5f },
+            { "sustain", 1.0f }, { "release", 2.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f }, { "eq1Freq", 110.0f },
+            { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f },
+            { "mx2Dst", 6.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 11.0f }, { "mx3Dst", 1.0f }, { "mx3Amt", 0.4f } } },
+
+        { "Cello Synth", "CORDES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.43f }, { "unison", 3.0f }, { "detune", 8.0f },
+            { "spread", 0.5f }, { "filterType", 1.0f }, { "cutoff", 1200.0f }, { "resonance", 1.0f },
+            { "fltEnvAmount", 0.3f }, { "fltAttack", 0.15f }, { "fltDecay", 0.4f }, { "fltSustain", 0.6f },
+            { "lfoRate", 5.2f }, { "attack", 0.15f }, { "decay", 0.3f }, { "sustain", 1.0f }, { "release", 0.3f },
+            { "mx1Src", 1.0f }, { "mx1Dst", 5.0f }, { "mx1Amt", 0.012f }, { "mx2Src", 9.0f }, { "mx2Dst", 3.0f },
+            { "mx2Amt", 0.5f }, { "mx3Src", 10.0f }, { "mx3Dst", 6.0f }, { "mx3Amt", 0.5f } } },
+
+        { "Harpe Synth", "CORDES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "oscBPos", 0.0f },
+            { "oscBOct", 1.0f }, { "oscBLevel", 0.2f }, { "unison", 1.0f }, { "filterType", 0.0f },
+            { "cutoff", 6000.0f }, { "noiseLevel", 0.06f }, { "noiseTone", 0.5f }, { "noiseDecay", 0.01f },
+            { "attack", 0.001f }, { "decay", 1.5f }, { "sustain", 0.0f }, { "release", 0.8f }, { "voiceGain", 3.0f },
+            { "eq1On", 1.0f }, { "eq1Type", 0.0f }, { "eq1Freq", 80.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f },
+            { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 7.0f }, { "mx2Amt", 0.5f } } },
 
         //======================================================================== CLAVIERS
         { "Digital EP", "CLAVIERS", {
@@ -740,7 +810,356 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "filterType", 1.0f }, { "cutoff", 1800.0f }, { "attack", 0.003f }, { "decay", 0.8f },
             { "sustain", 0.2f }, { "release", 0.6f }, { "chorusMix", 0.3f }, { "reverbMix", 0.4f },
             { "reverbSize", 0.85f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f },
-            { "mx2Dst", 16.0f }, { "mx2Amt", 0.5f } } }
+            { "mx2Dst", 16.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Rhodes", "CLAVIERS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "oscBPos", 0.0f },
+            { "fmAmount", 0.2f }, { "modDecay", 0.25f }, { "modSustain", 0.0f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 5500.0f }, { "velFilter", 0.5f }, { "attack", 0.002f },
+            { "decay", 1.6f }, { "sustain", 0.15f }, { "release", 0.35f }, { "voiceGain", 3.0f }, { "eq1On", 1.0f },
+            { "eq1Type", 0.0f }, { "eq1Freq", 70.0f }, { "eq1Q", 0.71f }, { "mx1Src", 2.0f }, { "mx1Dst", 16.0f },
+            { "mx1Amt", 0.35f }, { "mx2Src", 4.0f }, { "mx2Dst", 16.0f }, { "mx2Amt", 0.15f }, { "mx3Src", 9.0f },
+            { "mx3Dst", 3.0f }, { "mx3Amt", 0.5f }, { "mx4Src", 10.0f }, { "mx4Dst", 16.0f }, { "mx4Amt", 0.5f } } },
+
+        { "Wurli", "CLAVIERS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.286f }, { "fmAmount", 0.08f },
+            { "unison", 1.0f }, { "filterType", 0.0f }, { "cutoff", 2600.0f }, { "resonance", 1.2f },
+            { "distType", 0.0f }, { "distAmt", 0.1f }, { "velFilter", 0.6f }, { "attack", 0.002f }, { "decay", 0.9f },
+            { "sustain", 0.25f }, { "release", 0.2f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f }, { "eq1Freq", 90.0f },
+            { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f },
+            { "mx2Dst", 18.0f }, { "mx2Amt", 0.4f } } },
+
+        { "DX Piano", "CLAVIERS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "oscBPos", 0.0f },
+            { "fmAmount", 0.4f }, { "modDecay", 0.6f }, { "modSustain", 0.0f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 9000.0f }, { "velFilter", 0.5f }, { "attack", 0.001f },
+            { "decay", 1.8f }, { "sustain", 0.0f }, { "release", 0.4f }, { "voiceGain", 3.0f }, { "eq1On", 1.0f },
+            { "eq1Type", 0.0f }, { "eq1Freq", 60.0f }, { "eq1Q", 0.71f }, { "mx1Src", 2.0f }, { "mx1Dst", 16.0f },
+            { "mx1Amt", 0.5f }, { "mx2Src", 4.0f }, { "mx2Dst", 16.0f }, { "mx2Amt", 0.2f }, { "mx3Src", 9.0f },
+            { "mx3Dst", 3.0f }, { "mx3Amt", 0.5f }, { "mx4Src", 10.0f }, { "mx4Dst", 16.0f }, { "mx4Amt", 0.5f } } },
+
+        { "Clavinet", "CLAVIERS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 2.0f }, { "position", 0.35f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 2000.0f }, { "fltEnvAmount", 0.5f }, { "fltDecay", 0.1f },
+            { "fltSustain", 0.2f }, { "velFilter", 0.6f }, { "attack", 0.001f }, { "decay", 0.3f },
+            { "sustain", 0.0f }, { "release", 0.08f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f }, { "eq1Freq", 150.0f },
+            { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f },
+            { "mx2Dst", 18.0f }, { "mx2Amt", 0.4f } } },
+
+        { "Hammond", "CLAVIERS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 4.0f }, { "position", 0.83f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 9000.0f }, { "attack", 0.003f }, { "decay", 0.1f },
+            { "sustain", 1.0f }, { "release", 0.05f }, { "noiseLevel", 0.03f }, { "noiseTone", 0.9f },
+            { "noiseDecay", 0.01f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.4f }, { "mx2Src", 10.0f },
+            { "mx2Dst", 1.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Church Organ", "CLAVIERS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 4.0f }, { "position", 0.71f },
+            { "oscBLevel", 0.3f }, { "tableB", 4.0f }, { "oscBPos", 0.4f }, { "oscBOct", 1.0f }, { "unison", 2.0f },
+            { "detune", 5.0f }, { "subLevel", 0.3f }, { "filterType", 0.0f }, { "cutoff", 6000.0f },
+            { "attack", 0.05f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.4f }, { "mx1Src", 9.0f },
+            { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 1.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Harmonium", "CLAVIERS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.857f }, { "unison", 2.0f },
+            { "detune", 8.0f }, { "filterType", 0.0f }, { "cutoff", 3500.0f }, { "lfoRate", 5.0f },
+            { "attack", 0.04f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.2f }, { "mx1Src", 1.0f },
+            { "mx1Dst", 5.0f }, { "mx1Amt", 0.01f }, { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.5f },
+            { "mx3Src", 10.0f }, { "mx3Dst", 6.0f }, { "mx3Amt", 0.5f } } },
+
+        { "Synth Piano", "CLAVIERS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.143f }, { "unison", 2.0f },
+            { "detune", 4.0f }, { "filterType", 1.0f }, { "cutoff", 3500.0f }, { "fltEnvAmount", 0.4f },
+            { "fltDecay", 0.5f }, { "fltSustain", 0.1f }, { "velFilter", 0.6f }, { "noiseLevel", 0.08f },
+            { "noiseTone", 0.6f }, { "noiseDecay", 0.01f }, { "attack", 0.001f }, { "decay", 1.2f },
+            { "sustain", 0.05f }, { "release", 0.4f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f }, { "eq1Freq", 60.0f },
+            { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f },
+            { "mx2Dst", 19.0f }, { "mx2Amt", 0.5f } } },
+
+        //======================================================================== MALLETS
+        { "Vibraphone", "MALLETS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "oscBPos", 0.0f },
+            { "oscBOct", 2.0f }, { "oscBLevel", 0.15f }, { "fmAmount", 0.05f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 8000.0f }, { "lfoRate", 5.0f }, { "attack", 0.001f },
+            { "decay", 2.5f }, { "sustain", 0.0f }, { "release", 1.5f }, { "voiceGain", 3.0f }, { "eq1On", 1.0f },
+            { "eq1Type", 0.0f }, { "eq1Freq", 100.0f }, { "eq1Q", 0.71f }, { "mx1Src", 1.0f }, { "mx1Dst", 9.0f },
+            { "mx1Amt", 0.2f }, { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 10.0f },
+            { "mx3Dst", 7.0f }, { "mx3Amt", 0.5f } } },
+
+        { "Marimba", "MALLETS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.143f }, { "oscBPos", 0.0f },
+            { "oscBOct", 2.0f }, { "oscBLevel", 0.25f }, { "unison", 1.0f }, { "filterType", 0.0f },
+            { "cutoff", 4500.0f }, { "velFilter", 0.5f }, { "noiseLevel", 0.1f }, { "noiseTone", 0.4f },
+            { "noiseDecay", 0.01f }, { "attack", 0.001f }, { "decay", 0.6f }, { "sustain", 0.0f }, { "release", 0.3f },
+            { "voiceGain", 3.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f }, { "eq1Freq", 80.0f }, { "eq1Q", 0.71f },
+            { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 7.0f },
+            { "mx2Amt", 0.5f } } },
+
+        { "Xylophone", "MALLETS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "oscBPos", 0.0f },
+            { "oscBOct", 2.0f }, { "oscBLevel", 0.4f }, { "unison", 1.0f }, { "filterType", 0.0f },
+            { "cutoff", 9000.0f }, { "noiseLevel", 0.15f }, { "noiseTone", 0.8f }, { "noiseDecay", 0.008f },
+            { "attack", 0.001f }, { "decay", 0.25f }, { "sustain", 0.0f }, { "release", 0.15f }, { "voiceGain", 3.0f },
+            { "eq1On", 1.0f }, { "eq1Type", 0.0f }, { "eq1Freq", 150.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f },
+            { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 7.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Glockenspiel", "MALLETS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "oscBPos", 0.0f },
+            { "oscBOct", 2.0f }, { "oscBLevel", 0.2f }, { "fmAmount", 0.15f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 15000.0f }, { "attack", 0.001f }, { "decay", 1.2f },
+            { "sustain", 0.0f }, { "release", 0.8f }, { "voiceGain", 3.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f },
+            { "eq1Freq", 300.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f },
+            { "mx2Src", 10.0f }, { "mx2Dst", 16.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Music Box", "MALLETS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "oscAOct", 1.0f },
+            { "oscBPos", 0.0f }, { "oscBOct", 2.0f }, { "oscBLevel", 0.2f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 12000.0f }, { "attack", 0.001f }, { "decay", 0.9f },
+            { "sustain", 0.0f }, { "release", 0.5f }, { "voiceGain", 3.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f },
+            { "eq1Freq", 250.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f },
+            { "mx2Src", 10.0f }, { "mx2Dst", 7.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Kalimba", "MALLETS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "oscBPos", 0.0f },
+            { "oscBOct", 2.0f }, { "oscBLevel", 0.1f }, { "fmAmount", 0.12f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 6000.0f }, { "noiseLevel", 0.1f }, { "noiseTone", 0.5f },
+            { "noiseDecay", 0.01f }, { "attack", 0.001f }, { "decay", 0.7f }, { "sustain", 0.0f }, { "release", 0.4f },
+            { "voiceGain", 3.0f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f }, { "eq1Freq", 120.0f }, { "eq1Q", 0.71f },
+            { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 16.0f },
+            { "mx2Amt", 0.5f } } },
+
+        //======================================================================== CUIVRES
+        { "Trompette", "CUIVRES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.43f }, { "unison", 2.0f }, { "detune", 5.0f },
+            { "filterType", 1.0f }, { "cutoff", 700.0f }, { "resonance", 1.0f }, { "fltEnvAmount", 0.6f },
+            { "fltAttack", 0.06f }, { "fltDecay", 0.3f }, { "fltSustain", 0.5f }, { "velFilter", 0.6f },
+            { "noiseLevel", 0.05f }, { "noiseTone", 0.6f }, { "noiseDecay", 5.0f }, { "attack", 0.04f },
+            { "decay", 0.2f }, { "sustain", 0.9f }, { "release", 0.15f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
+            { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 19.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Trombone", "CUIVRES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.43f }, { "unison", 2.0f }, { "detune", 5.0f },
+            { "filterType", 1.0f }, { "cutoff", 450.0f }, { "resonance", 1.0f }, { "fltEnvAmount", 0.55f },
+            { "fltAttack", 0.08f }, { "fltDecay", 0.35f }, { "fltSustain", 0.5f }, { "velFilter", 0.5f },
+            { "attack", 0.07f }, { "decay", 0.2f }, { "sustain", 0.9f }, { "release", 0.2f }, { "mx1Src", 9.0f },
+            { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 6.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Section Cuivres", "CUIVRES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.43f }, { "unison", 5.0f },
+            { "detune", 10.0f }, { "spread", 0.7f }, { "filterType", 1.0f }, { "cutoff", 900.0f },
+            { "fltEnvAmount", 0.55f }, { "fltAttack", 0.06f }, { "fltDecay", 0.3f }, { "fltSustain", 0.55f },
+            { "velFilter", 0.6f }, { "attack", 0.06f }, { "decay", 0.2f }, { "sustain", 0.9f }, { "release", 0.25f },
+            { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 6.0f },
+            { "mx2Amt", 0.5f } } },
+
+        { "Stab Cuivres", "CUIVRES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.43f }, { "unison", 5.0f },
+            { "detune", 10.0f }, { "spread", 0.7f }, { "filterType", 1.0f }, { "cutoff", 1000.0f },
+            { "fltEnvAmount", 0.6f }, { "fltAttack", 0.005f }, { "fltDecay", 0.25f }, { "fltSustain", 0.0f },
+            { "velFilter", 0.6f }, { "attack", 0.005f }, { "decay", 0.35f }, { "sustain", 0.0f }, { "release", 0.2f },
+            { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 6.0f },
+            { "mx2Amt", 0.5f } } },
+
+        { "Cuivre Doux", "CUIVRES", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.36f }, { "unison", 3.0f }, { "detune", 6.0f },
+            { "filterType", 1.0f }, { "cutoff", 600.0f }, { "fltEnvAmount", 0.4f }, { "fltAttack", 0.15f },
+            { "fltDecay", 0.4f }, { "fltSustain", 0.6f }, { "attack", 0.12f }, { "decay", 0.3f }, { "sustain", 0.9f },
+            { "release", 0.3f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f },
+            { "mx2Dst", 6.0f }, { "mx2Amt", 0.5f } } },
+
+        //======================================================================== VENTS
+        { "Flute", "VENTS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.07f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 7000.0f }, { "noiseLevel", 0.08f }, { "noiseType", 1.0f },
+            { "noiseTone", 0.7f }, { "noiseDecay", 5.0f }, { "lfoRate", 5.2f }, { "attack", 0.06f }, { "decay", 0.1f },
+            { "sustain", 1.0f }, { "release", 0.15f }, { "voiceGain", 3.0f }, { "mx1Src", 1.0f }, { "mx1Dst", 5.0f },
+            { "mx1Amt", 0.01f }, { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 10.0f },
+            { "mx3Dst", 19.0f }, { "mx3Amt", 0.5f } } },
+
+        { "Flute de Pan", "VENTS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 5000.0f }, { "noiseLevel", 0.18f }, { "noiseType", 1.0f },
+            { "noiseTone", 0.6f }, { "noiseDecay", 5.0f }, { "lfoRate", 4.8f }, { "attack", 0.08f }, { "decay", 0.1f },
+            { "sustain", 1.0f }, { "release", 0.2f }, { "voiceGain", 3.0f }, { "mx1Src", 1.0f }, { "mx1Dst", 5.0f },
+            { "mx1Amt", 0.008f }, { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 10.0f },
+            { "mx3Dst", 19.0f }, { "mx3Amt", 0.5f } } },
+
+        { "Shakuhachi", "VENTS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 3500.0f }, { "noiseLevel", 0.25f }, { "noiseType", 1.0f },
+            { "noiseTone", 0.5f }, { "noiseDecay", 5.0f }, { "lfoRate", 4.5f }, { "attack", 0.1f }, { "decay", 0.1f },
+            { "sustain", 1.0f }, { "release", 0.25f }, { "voiceGain", 3.0f }, { "mx1Src", 1.0f }, { "mx1Dst", 5.0f },
+            { "mx1Amt", 0.03f }, { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 10.0f },
+            { "mx3Dst", 19.0f }, { "mx3Amt", 0.5f } } },
+
+        { "Ocarina", "VENTS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 2500.0f }, { "noiseLevel", 0.02f }, { "noiseType", 1.0f },
+            { "noiseDecay", 5.0f }, { "lfoRate", 5.0f }, { "attack", 0.05f }, { "decay", 0.1f }, { "sustain", 1.0f },
+            { "release", 0.15f }, { "voiceGain", 3.0f }, { "mx1Src", 1.0f }, { "mx1Dst", 5.0f }, { "mx1Amt", 0.01f },
+            { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 10.0f }, { "mx3Dst", 19.0f },
+            { "mx3Amt", 0.5f } } },
+
+        { "Clarinette", "VENTS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.286f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 2200.0f }, { "resonance", 1.0f }, { "noiseLevel", 0.03f },
+            { "noiseType", 1.0f }, { "noiseDecay", 5.0f }, { "lfoRate", 5.0f }, { "attack", 0.05f }, { "decay", 0.1f },
+            { "sustain", 1.0f }, { "release", 0.1f }, { "mx1Src", 1.0f }, { "mx1Dst", 5.0f }, { "mx1Amt", 0.006f },
+            { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 10.0f }, { "mx3Dst", 19.0f },
+            { "mx3Amt", 0.5f } } },
+
+        { "Hautbois", "VENTS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.714f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 3000.0f }, { "resonance", 1.5f }, { "noiseLevel", 0.03f },
+            { "noiseType", 1.0f }, { "noiseDecay", 5.0f }, { "lfoRate", 5.0f }, { "attack", 0.04f }, { "decay", 0.1f },
+            { "sustain", 1.0f }, { "release", 0.1f }, { "mx1Src", 1.0f }, { "mx1Dst", 5.0f }, { "mx1Amt", 0.008f },
+            { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 10.0f }, { "mx3Dst", 19.0f },
+            { "mx3Amt", 0.5f } } },
+
+        { "Harmonica", "VENTS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.857f }, { "unison", 2.0f },
+            { "detune", 14.0f }, { "filterType", 0.0f }, { "cutoff", 3500.0f }, { "noiseLevel", 0.04f },
+            { "noiseType", 1.0f }, { "noiseDecay", 5.0f }, { "attack", 0.03f }, { "decay", 0.1f }, { "sustain", 1.0f },
+            { "release", 0.1f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f },
+            { "mx2Dst", 6.0f }, { "mx2Amt", 0.5f } } },
+
+        //======================================================================== VOIX
+        { "Voix Aah", "VOIX", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 1.0f }, { "position", 0.0f }, { "unison", 5.0f },
+            { "detune", 10.0f }, { "spread", 0.7f }, { "filterType", 0.0f }, { "cutoff", 7000.0f },
+            { "lfoRate", 5.0f }, { "attack", 0.3f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.5f },
+            { "mx1Src", 1.0f }, { "mx1Dst", 5.0f }, { "mx1Amt", 0.025f }, { "mx2Src", 9.0f }, { "mx2Dst", 3.0f },
+            { "mx2Amt", 0.5f }, { "mx3Src", 10.0f }, { "mx3Dst", 1.0f }, { "mx3Amt", 0.5f } } },
+
+        { "Voix Ooh", "VOIX", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 1.0f }, { "position", 0.571f },
+            { "unison", 5.0f }, { "detune", 10.0f }, { "spread", 0.7f }, { "filterType", 0.0f }, { "cutoff", 6000.0f },
+            { "lfoRate", 5.0f }, { "attack", 0.3f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.5f },
+            { "mx1Src", 1.0f }, { "mx1Dst", 5.0f }, { "mx1Amt", 0.025f }, { "mx2Src", 9.0f }, { "mx2Dst", 3.0f },
+            { "mx2Amt", 0.5f }, { "mx3Src", 10.0f }, { "mx3Dst", 1.0f }, { "mx3Amt", 0.5f } } },
+
+        { "Choeur", "VOIX", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 1.0f }, { "position", 0.43f }, { "unison", 7.0f },
+            { "detune", 20.0f }, { "spread", 1.0f }, { "filterType", 0.0f }, { "cutoff", 6000.0f }, { "attack", 0.5f },
+            { "decay", 0.3f }, { "sustain", 1.0f }, { "release", 0.9f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
+            { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 1.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 11.0f },
+            { "mx3Dst", 6.0f }, { "mx3Amt", 0.5f } } },
+
+        { "Voix Lunaire", "VOIX", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 1.0f }, { "position", 0.1f }, { "oscBPos", 0.1f },
+            { "tableB", 1.0f }, { "oscBOct", 1.0f }, { "oscBLevel", 0.3f }, { "unison", 4.0f }, { "detune", 14.0f },
+            { "spread", 0.9f }, { "filterType", 0.0f }, { "cutoff", 5500.0f }, { "lfo3Rate", 0.15f },
+            { "lfo3Shape", 1.0f }, { "attack", 0.8f }, { "decay", 0.3f }, { "sustain", 1.0f }, { "release", 1.2f },
+            { "mx1Src", 14.0f }, { "mx1Dst", 1.0f }, { "mx1Amt", 0.4f }, { "mx2Src", 9.0f }, { "mx2Dst", 3.0f },
+            { "mx2Amt", 0.5f }, { "mx3Src", 10.0f }, { "mx3Dst", 1.0f }, { "mx3Amt", 0.5f } } },
+
+        //======================================================================== PLUCKS
+        { "Basse Pincee", "PLUCKS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 1.0f }, { "glide", 0.0f }, { "position", 0.143f },
+            { "unison", 1.0f }, { "filterType", 1.0f }, { "cutoff", 600.0f }, { "fltEnvAmount", 0.5f },
+            { "fltDecay", 0.2f }, { "fltSustain", 0.0f }, { "velFilter", 0.5f }, { "noiseLevel", 0.04f },
+            { "noiseTone", 0.4f }, { "noiseDecay", 0.01f }, { "attack", 0.002f }, { "decay", 0.6f },
+            { "sustain", 0.1f }, { "release", 0.15f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f },
+            { "mx2Src", 10.0f }, { "mx2Dst", 19.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Contrebasse", "PLUCKS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 1.0f }, { "glide", 0.0f }, { "position", 0.0f },
+            { "subLevel", 0.3f }, { "unison", 1.0f }, { "filterType", 1.0f }, { "cutoff", 500.0f },
+            { "noiseLevel", 0.1f }, { "noiseTone", 0.3f }, { "noiseDecay", 0.01f }, { "attack", 0.002f },
+            { "decay", 0.7f }, { "sustain", 0.05f }, { "release", 0.2f }, { "voiceGain", 3.0f }, { "mx1Src", 9.0f },
+            { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 19.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Clavecin", "PLUCKS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.43f }, { "unison", 2.0f }, { "detune", 6.0f },
+            { "filterType", 0.0f }, { "cutoff", 4500.0f }, { "fltEnvAmount", 0.5f }, { "fltDecay", 0.1f },
+            { "fltSustain", 0.0f }, { "noiseLevel", 0.12f }, { "noiseTone", 0.7f }, { "noiseDecay", 0.008f },
+            { "attack", 0.001f }, { "decay", 0.5f }, { "sustain", 0.0f }, { "release", 0.1f }, { "eq1On", 1.0f },
+            { "eq1Type", 0.0f }, { "eq1Freq", 120.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
+            { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 19.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Luth Synth", "PLUCKS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.286f }, { "unison", 1.0f },
+            { "filterType", 1.0f }, { "cutoff", 1800.0f }, { "fltEnvAmount", 0.5f }, { "fltDecay", 0.25f },
+            { "fltSustain", 0.0f }, { "attack", 0.001f }, { "decay", 0.8f }, { "sustain", 0.0f }, { "release", 0.2f },
+            { "eq1On", 1.0f }, { "eq1Type", 0.0f }, { "eq1Freq", 90.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f },
+            { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 18.0f }, { "mx2Amt", 0.4f } } },
+
+        { "Banjo Synth", "PLUCKS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.571f }, { "unison", 1.0f },
+            { "filterType", 0.0f }, { "cutoff", 3500.0f }, { "fltEnvAmount", 0.5f }, { "fltDecay", 0.08f },
+            { "fltSustain", 0.0f }, { "pitchEnvAmt", 3.0f }, { "pitchEnvDecay", 0.02f }, { "attack", 0.001f },
+            { "decay", 0.35f }, { "sustain", 0.0f }, { "release", 0.1f }, { "eq1On", 1.0f }, { "eq1Type", 0.0f },
+            { "eq1Freq", 150.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f },
+            { "mx2Src", 10.0f }, { "mx2Dst", 20.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Nylon Synth", "PLUCKS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.143f }, { "oscBPos", 0.0f },
+            { "oscBOct", 1.0f }, { "oscBLevel", 0.2f }, { "unison", 1.0f }, { "filterType", 0.0f },
+            { "cutoff", 3000.0f }, { "fltEnvAmount", 0.5f }, { "fltDecay", 0.3f }, { "fltSustain", 0.0f },
+            { "attack", 0.001f }, { "decay", 0.9f }, { "sustain", 0.0f }, { "release", 0.2f }, { "eq1On", 1.0f },
+            { "eq1Type", 0.0f }, { "eq1Freq", 80.0f }, { "eq1Q", 0.71f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
+            { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 7.0f }, { "mx2Amt", 0.5f } } },
+
+        //======================================================================== PERCUSSIONS
+        { "Hat Ferme", "PERCUSSIONS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.3f }, { "position", 0.286f },
+            { "tableB", 0.0f }, { "oscBPos", 0.286f }, { "oscBOct", 1.0f }, { "oscBTune", 30.0f },
+            { "ringAmount", 0.5f }, { "noiseLevel", 1.0f }, { "noiseType", 0.0f }, { "noiseTone", 1.0f },
+            { "noiseDecay", 0.05f }, { "unison", 1.0f }, { "filterType", 2.0f }, { "cutoff", 6500.0f },
+            { "attack", 0.001f }, { "decay", 0.05f }, { "sustain", 0.0f }, { "release", 0.03f }, { "mx1Src", 9.0f },
+            { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 17.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Hat Ouvert", "PERCUSSIONS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.3f }, { "position", 0.286f },
+            { "oscBPos", 0.286f }, { "oscBOct", 1.0f }, { "oscBTune", 30.0f }, { "ringAmount", 0.5f },
+            { "noiseLevel", 1.0f }, { "noiseType", 0.0f }, { "noiseTone", 1.0f }, { "noiseDecay", 0.35f },
+            { "unison", 1.0f }, { "filterType", 2.0f }, { "cutoff", 6500.0f }, { "attack", 0.001f },
+            { "decay", 0.35f }, { "sustain", 0.0f }, { "release", 0.3f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
+            { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 17.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Shaker", "PERCUSSIONS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "noiseLevel", 1.0f },
+            { "noiseType", 0.0f }, { "noiseTone", 0.6f }, { "noiseDecay", 0.09f }, { "unison", 1.0f },
+            { "filterType", 3.0f }, { "cutoff", 6500.0f }, { "resonance", 1.2f }, { "attack", 0.02f },
+            { "decay", 0.09f }, { "sustain", 0.0f }, { "release", 0.05f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
+            { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 19.0f }, { "mx2Amt", 0.3f } } },
+
+        { "Tambourin", "PERCUSSIONS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.3f }, { "position", 0.286f },
+            { "oscBPos", 0.286f }, { "oscBOct", 2.0f }, { "oscBTune", 20.0f }, { "ringAmount", 0.35f },
+            { "noiseLevel", 0.7f }, { "noiseType", 0.0f }, { "noiseTone", 0.9f }, { "noiseDecay", 0.2f },
+            { "unison", 1.0f }, { "filterType", 2.0f }, { "cutoff", 4500.0f }, { "attack", 0.003f },
+            { "decay", 0.22f }, { "sustain", 0.0f }, { "release", 0.12f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
+            { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 17.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Claves", "PERCUSSIONS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "oscAOct", 2.0f }, { "unison", 1.0f },
+            { "pitchEnvAmt", 3.0f }, { "pitchEnvDecay", 0.01f }, { "filterType", 0.0f }, { "cutoff", 8000.0f },
+            { "attack", 0.001f }, { "decay", 0.08f }, { "sustain", 0.0f }, { "release", 0.05f }, { "voiceGain", 3.0f },
+            { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 20.0f },
+            { "mx2Amt", 0.5f } } },
+
+        { "Woodblock", "PERCUSSIONS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.143f }, { "oscAOct", 1.0f },
+            { "noiseLevel", 0.1f }, { "noiseTone", 0.7f }, { "noiseDecay", 0.01f }, { "unison", 1.0f },
+            { "filterType", 3.0f }, { "cutoff", 1800.0f }, { "resonance", 4.0f }, { "attack", 0.001f },
+            { "decay", 0.12f }, { "sustain", 0.0f }, { "release", 0.05f }, { "voiceGain", 3.0f }, { "mx1Src", 9.0f },
+            { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 19.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Triangle", "PERCUSSIONS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "oscAOct", 2.0f },
+            { "oscBPos", 0.0f }, { "oscBOct", 2.0f }, { "oscBTune", 40.0f }, { "ringAmount", 0.6f },
+            { "unison", 1.0f }, { "filterType", 2.0f }, { "cutoff", 1500.0f }, { "attack", 0.001f }, { "decay", 2.0f },
+            { "sustain", 0.0f }, { "release", 1.5f }, { "voiceGain", 3.0f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
+            { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 17.0f }, { "mx2Amt", 0.5f } } },
+
+        { "Rim Click", "PERCUSSIONS", {
+            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "position", 0.0f }, { "oscAOct", 2.0f },
+            { "pitchEnvAmt", 6.0f }, { "pitchEnvDecay", 0.008f }, { "noiseLevel", 0.3f }, { "noiseTone", 0.8f },
+            { "noiseDecay", 0.02f }, { "unison", 1.0f }, { "filterType", 3.0f }, { "cutoff", 2500.0f },
+            { "resonance", 2.5f }, { "attack", 0.001f }, { "decay", 0.04f }, { "sustain", 0.0f }, { "release", 0.03f },
+            { "voiceGain", 3.0f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f },
+            { "mx2Dst", 19.0f }, { "mx2Amt", 0.5f } } }
     };
 
     return presets;
