@@ -61,5 +61,5 @@ target_sources(Snapshot PRIVATE
     Source/FactoryBank.cpp
     Source/FxRack.cpp)
 set_target_properties(Snapshot PROPERTIES EXCLUDE_FROM_ALL TRUE)
-target_compile_definitions(Snapshot PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+target_compile_definitions(Snapshot PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_MODAL_LOOPS_PERMITTED=1)
 target_link_libraries(Snapshot PRIVATE juce::juce_audio_utils juce::juce_dsp juce::juce_recommended_config_flags)
