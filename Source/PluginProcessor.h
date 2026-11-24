@@ -219,6 +219,7 @@ private:
     juce::ADSR modEnv;    // position de la wavetable
     juce::ADSR fltEnv;    // fréquence de coupure du filtre
     juce::dsp::StateVariableTPTFilter<float> filter, filter2;   // filter2 : 2e étage pour le LP 24 dB
+    juce::dsp::StateVariableTPTFilter<float> f2a, f2b, f2c;      // FILTRE 2 (f2b/f2c : NOTCH et FORMANTS)
     juce::SmoothedValue<float> position;
 
     double sr = 44100.0;

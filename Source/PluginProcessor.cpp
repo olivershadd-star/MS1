@@ -377,6 +377,12 @@ void SynthVoice::prepare (double sampleRate, int blockSize)
     filter2.prepare (spec);
     filter2.setType (juce::dsp::StateVariableTPTFilterType::lowpass);
     filter2.setResonance (0.7071f);
+
+    for (auto* f : { &f2a, &f2b, &f2c })
+    {
+        f->prepare (spec);
+        f->setType (juce::dsp::StateVariableTPTFilterType::lowpass);
+    }
 }
 
 float SynthVoice::nextNoise (NoiseGen& n, int type, float tone)
@@ -560,6 +566,30 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         filter2.setResonance (baseRes);
     else
         filter2.setResonance (0.7071f);
+
+    // --- Filtre 2 (0 off, 1 LP, 2 HP, 3 BP, 4 NOTCH, 5 FORMANTS) : en série ou en parallèle du filtre 1
+    const int   f2Type   = (int) param ("f2Type");
+    const bool  f2Par    = param ("f2Mode") > 0.5f;
+    const float f2Cut    = param ("f2Cutoff");
+    const float f2Res    = param ("f2Res");
+    const float f2Mix    = param ("f2Mix");
+    const float f2Vowel  = param ("f2Vowel");
+    {
+        using FT = juce::dsp::StateVariableTPTFilterType;
+        switch (f2Type)
+        {
+            case 1: f2a.setType (FT::lowpass);  break;
+            case 2: f2a.setType (FT::highpass); break;
+            case 3: f2a.setType (FT::bandpass); break;
+            case 4: f2a.setType (FT::lowpass);  f2b.setType (FT::highpass); break;
+            case 5: f2a.setType (FT::bandpass); f2b.setType (FT::bandpass); f2c.setType (FT::bandpass); break;
+            default: break;
+        }
+        const float q = f2Type == 5 ? 2.0f + f2Res * 2.5f : f2Res;
+        f2a.setResonance (q);
+        f2b.setResonance (f2Type == 5 ? q : f2Res);
+        f2c.setResonance (q);
+    }
 
     // --- Vélocité
     const float velAmp    = param ("velAmp");
@@ -755,7 +785,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         src[13] = pitchEnvVal;
         src[14] = lfo3;  src[15] = lfo4;
 
-        std::array<float, 21> tgt {};
+        std::array<float, 23> tgt {};
         for (int s = 0; s < numSlots; ++s)
         {
             const auto& sl = slots[(size_t) s];
@@ -883,6 +913,8 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
                 filter2.setResonance (resNow);
         }
 
+        const float preL = l, preR = r;       // signal avant le filtre 1 (entrée du filtre 2 en mode parallèle)
+
         if (comb)
         {
             // y[n] = x[n] + g * y[n - d], d = periode du cutoff (interpolation lineaire)
@@ -921,6 +953,49 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         {
             l = filter2.processSample (0, l);
             r = filter2.processSample (1, r);
+        }
+
+        // Filtre 2
+        if (f2Type > 0 && f2Mix > 0.001f)
+        {
+            const float c2 = juce::jlimit (20.0f, 20000.0f, f2Cut * std::exp2 (tgt[21] * 5.0f));
+            float inL = f2Par ? preL : l, inR = f2Par ? preR : r;
+            float oL, oR;
+
+            if (f2Type == 5)
+            {
+                static const float vw[5][3] = { { 800.0f, 1150.0f, 2900.0f }, { 400.0f, 1600.0f, 2700.0f }, { 350.0f, 1700.0f, 2700.0f },
+                                                { 450.0f, 800.0f, 2830.0f }, { 325.0f, 700.0f, 2700.0f } };
+                static const float vg[3] = { 1.6f, 1.2f, 0.8f };
+                const float pos = juce::jlimit (0.0f, 1.0f, f2Vowel + tgt[22]) * 4.0f;
+                const int i0 = juce::jlimit (0, 3, (int) pos);
+                const float fr = pos - (float) i0;
+                const float shift = juce::jlimit (0.25f, 4.0f, c2 / 1000.0f);
+                juce::dsp::StateVariableTPTFilter<float>* fs[3] = { &f2a, &f2b, &f2c };
+                oL = oR = 0.0f;
+                for (int k = 0; k < 3; ++k)
+                {
+                    fs[k]->setCutoffFrequency (juce::jlimit (60.0f, 12000.0f, (vw[i0][k] * (1.0f - fr) + vw[i0 + 1][k] * fr) * shift));
+                    oL += vg[k] * fs[k]->processSample (0, inL);
+                    oR += vg[k] * fs[k]->processSample (1, inR);
+                }
+            }
+            else if (f2Type == 4)
+            {
+                f2a.setCutoffFrequency (c2);
+                f2b.setCutoffFrequency (c2);
+                oL = f2a.processSample (0, inL) + f2b.processSample (0, inL);
+                oR = f2a.processSample (1, inR) + f2b.processSample (1, inR);
+            }
+            else
+            {
+                f2a.setCutoffFrequency (c2);
+                oL = f2a.processSample (0, inL);
+                oR = f2a.processSample (1, inR);
+            }
+
+            l += f2Mix * (oL - l);
+            r += f2Mix * (oR - r);
         }
 
         // Distorsion (après le filtre)
@@ -1103,6 +1178,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
 
     // Filtre
     addChoice ("filterType", "Filtre Type", StringArray { "LP 12", "LP 24", "HP", "BP", "NOTCH", "COMB" }, 0);
+    addChoice ("f2Type", "Filtre 2 Type", StringArray { "OFF", "LP 12", "HP", "BP", "NOTCH", "FORMANTS" }, 0);
+    addChoice ("f2Mode", "Filtre 2 Mode", StringArray { "SERIE", "PARALLELE" }, 0);
+    addFloat  ("f2Cutoff", "Filtre 2 Cutoff", NormalisableRange<float> (20.0f, 20000.0f, 0.0f, 0.3f), 1000.0f);
+    addFloat  ("f2Res",    "Filtre 2 Reso", NormalisableRange<float> (0.5f, 10.0f, 0.0f, 0.5f), 0.7f);
+    addFloat  ("f2Mix",    "Filtre 2 Mix", NormalisableRange<float> (0.0f, 1.0f), 1.0f);
+    addFloat  ("f2Vowel",  "Filtre 2 Voyelle", NormalisableRange<float> (0.0f, 1.0f), 0.0f);
     addFloat  ("cutoff",    "Cutoff", NormalisableRange<float> (20.0f, 20000.0f, 0.0f, 0.3f), 2000.0f);
     addFloat  ("resonance", "Resonance", NormalisableRange<float> (0.5f, 10.0f, 0.0f, 0.5f), 0.7f);
     addFloat  ("drive",     "Drive", unit, 0.0f);
@@ -2228,7 +2309,8 @@ juce::StringArray MonSyntheProcessor::modTargetNames()
              "UNISON  DESACCORD", "OSC B  NIVEAU", "FILTRE  DRIVE", "AMP  VOLUME",
              "ENV  QTE ENV FILTRE", "ENV  QTE ENV MOD", "ENV  DECAY VOLUME", "ENV  DECAY FILTRE",
              "OSC A  WARP", "OSC B  WARP", "FM/RING  FM", "FM/RING  RING",
-             "DISTO  QUANTITE", "BRUIT  NIVEAU", "PITCH  QTE ENV PITCH" };
+             "DISTO  QUANTITE", "BRUIT  NIVEAU", "PITCH  QTE ENV PITCH",
+             "FILTRE 2  CUTOFF", "FILTRE 2  VOYELLE" };
 }
 
 //==============================================================================

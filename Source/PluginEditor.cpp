@@ -462,6 +462,8 @@ const MonSyntheEditor::MenuDef& MonSyntheEditor::menuAt (int index)
                                                     { "drive", "DRIVE" }, { "fltEnvAmount", "ENV AMT" },
                                                     { "fltAttack", "ATTACK" }, { "fltDecay", "DECAY" },
                                                     { "fltSustain", "SUSTAIN" }, { "fltRelease", "RELEASE" } } },
+        { "FILTRE 2",  1, VizFilter2, VizSpectrum,{ { "f2Cutoff", "CUTOFF" }, { "f2Res", "RESO" },
+                                                    { "f2Mix", "MIX" }, { "f2Vowel", "VOYELLE" } } },
         { "DISTO",     4, VizDisto, VizSpectrum,  { { "distAmt", "QUANTITE" }, { "distMix", "MIX" },
                                                     { "drive", "DRIVE PRE" } } },
         { "ENV AMP",   5, VizEnvAmp, VizSpectrum, { { "attack", "ATTACK" }, { "decay", "DECAY" },
@@ -581,6 +583,7 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     setupCombo (tableA, "tableA", 0);        setupCombo (warpA, "warpModeA", 0);
     setupCombo (tableB, "tableB", 1);        setupCombo (warpB, "warpModeB", 1);
     setupCombo (filterType, "filterType", 4);
+    setupCombo (f2Type, "f2Type", 1);        setupCombo (f2Mode, "f2Mode", 1);
     setupCombo (lfoShape, "lfoShape", 1);    setupCombo (lfoSync, "lfoSync", 1);
     setupCombo (lfo2Shape, "lfo2Shape", 2);  setupCombo (lfo2Sync, "lfo2Sync", 2);
     setupCombo (lfo3Shape, "lfo3Shape", 3);  setupCombo (lfo3Sync, "lfo3Sync", 3);
@@ -909,6 +912,8 @@ void MonSyntheEditor::updateMenuVisibility()
     resampleAButton.setVisible (currentMenu == mOscA);
     resampleBButton.setVisible (currentMenu == mOscB);
     filterType.box.setVisible (currentMenu == mFilter);
+    f2Type.box.setVisible (currentMenu == mFilter2);
+    f2Mode.box.setVisible (currentMenu == mFilter2);
     lfoShape.box.setVisible (currentMenu == mLfo);
     lfoSync.box.setVisible (currentMenu == mLfo);
     lfo2Shape.box.setVisible (currentMenu == mLfo);
@@ -1016,6 +1021,7 @@ void MonSyntheEditor::updateLeds()
             case mString: lvl = pv ("strLevel") > 0.01f ? 0.35f + 0.65f * pulse (2.0, 0.0) : 0.12f;  break;
             case mNoise:  lvl = pv ("noiseLevel") > 0.01f ? 0.3f + 0.7f * pulse (5.0, 0.0) : 0.12f;  break;
             case mPitch:  lvl = std::abs (pv ("pitchEnvAmt")) > 0.5f ? (active ? 1.0f : 0.6f) : 0.12f;  break;
+            case mFilter2: lvl = (int) pv ("f2Type") > 0 ? (active ? 0.35f + 0.65f * pulse (2.6, 1.5) : 0.6f) : 0.12f;  break;
             case mFilter: lvl = active ? 0.35f + 0.65f * pulse (2.1, 0.5) : 0.12f;     break;
             case mDisto:  lvl = pv ("distAmt") > 0.01f ? 0.4f + 0.6f * pulse (7.0, 0.0) : 0.12f;  break;
             case mEnvAmp: lvl = active ? 1.0f : 0.12f;                                  break;
@@ -1131,7 +1137,7 @@ void MonSyntheEditor::resized()
     // Menus
     menuPanel = R (8, 60, 168, 476);
     for (int i = 0; i < numMenus; ++i)
-        menuButtons[(size_t) i].setBounds (R (14 + (i % 2) * 78, 88 + (i / 2) * 40, 74, 36));
+        menuButtons[(size_t) i].setBounds (R (14 + (i % 2) * 78, 88 + (i / 2) * 37, 74, 34));
 
     // Écrans
     screenAPanel = R (184, 60, 410, 476);
@@ -1157,6 +1163,7 @@ void MonSyntheEditor::resized()
             tableA.box.setBounds (first);       warpA.box.setBounds (second);       importAButton.setBounds (t1);  resampleAButton.setBounds (t2);
             tableB.box.setBounds (first);       warpB.box.setBounds (second);       importBButton.setBounds (t1);  resampleBButton.setBounds (t2);
             filterType.box.setBounds (first);
+            f2Type.box.setBounds (first);       f2Mode.box.setBounds (second);
             lfoShape.box.setBounds (first);     lfoSync.box.setBounds (second);
             lfo3Shape.box.setBounds (first);    lfo3Sync.box.setBounds (second);
             monoButton.setBounds (first);
@@ -1694,6 +1701,7 @@ void MonSyntheEditor::drawViz (juce::Graphics& g, int viz, juce::Rectangle<float
         case VizUnison:    drawUnisonViz (g, r, colour);       break;
         case VizFmRing:    drawFmRingViz (g, r, colour);       break;
         case VizFilter:    drawFilterViz (g, r, colour);       break;
+        case VizFilter2:   drawFilter2Viz (g, r, colour);      break;
         case VizEnvFilter: drawEnvelopeViz (g, r, colour, "fltAttack", "fltDecay", "fltSustain", "fltRelease"); break;
         case VizEnvAmp:    drawEnvelopeViz (g, r, colour, "attack", "decay", "sustain", "release");            break;
         case VizEnvMod:    drawEnvelopeViz (g, r, colour, "modAttack", "modDecay", "modSustain", "modRelease"); break;

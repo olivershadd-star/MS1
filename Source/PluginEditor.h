@@ -306,7 +306,7 @@ private:
 
     enum Viz { VizNone = 0, VizScopeA, VizUnison, VizScopeB, VizFmRing, VizFilter,
                VizEnvFilter, VizEnvAmp, VizEnvMod, VizLfo1, VizLfo2, VizLfo3, VizLfo4, VizGlide,
-               VizChorus, VizDelay, VizReverb, VizMatrix, VizSpectrum, VizNoise, VizPitch, VizDisto, VizComp, VizString };
+               VizChorus, VizDelay, VizReverb, VizMatrix, VizSpectrum, VizNoise, VizPitch, VizDisto, VizComp, VizString, VizFilter2 };
 
     struct ParamSlot { const char* id; const char* label; };
     struct MenuDef   { const char* name; int role; int vizA; int vizB; ParamSlot p[8]; };
@@ -317,8 +317,8 @@ private:
 
     // L'interface est dessinée pour 1280 x 720 puis mise à l'échelle (fenêtre redimensionnable, 16:9)
     static constexpr int baseWidth = 1280, baseHeight = 720;
-    static constexpr int numMenus = 22, matrixMenu = 21;
-    enum MenuId { mOscA = 0, mOscB, mFmRing, mUnison, mNoise, mString, mPitch, mFilter, mDisto, mEnvAmp, mEnvMod,
+    static constexpr int numMenus = 23, matrixMenu = 22;
+    enum MenuId { mOscA = 0, mOscB, mFmRing, mUnison, mNoise, mString, mPitch, mFilter, mFilter2, mDisto, mEnvAmp, mEnvMod,
                   mLfo, mLfo34, mJeu, mChorus, mPhaser, mDelay, mReverb, mEq, mMaster, mRack, mMatrix };
 
     static const MenuDef& menuAt (int index);
@@ -354,6 +354,7 @@ private:
     void drawUnisonViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
     void drawFmRingViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
     void drawFilterViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
+    void drawFilter2Viz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour);
     void drawEnvelopeViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour,
                           const char* a, const char* d, const char* s, const char* rel);
     void drawLfoViz (juce::Graphics&, juce::Rectangle<float> r, juce::Colour colour, int which);
@@ -389,7 +390,7 @@ private:
     std::array<Knob*, 12> mixAmt {};
 
     NamedCombo tableA, tableB, warpA, warpB, filterType, lfoShape, lfoSync, lfo2Shape, lfo2Sync, lfo3Shape, lfo3Sync, lfo4Shape, lfo4Sync, delaySync, delayMode,
-               noiseType, phaseMode, distType;
+               noiseType, phaseMode, distType, f2Type, f2Mode;
     juce::TextButton monoButton;
     std::unique_ptr<APVTS::ButtonAttachment> monoAttachment;
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> captions;
