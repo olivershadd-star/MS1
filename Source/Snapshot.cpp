@@ -19,12 +19,12 @@ int main()
         return 0;
     };
 
-    const Shot shots[] = { { "osc.png", find ("Reese Noir"), MonSyntheEditor::mOscA },
-                           { "filtre2.png", find ("Chorale A-E-I-O-U"), MonSyntheEditor::mFilter2 },
-                           { "rack.png", find ("Fold Bass"), MonSyntheEditor::mRack },
-                           { "matrice.png", find ("Reese Noir"), MonSyntheEditor::matrixMenu },
-                           { "eq.png", find ("Shimmer Pad"), MonSyntheEditor::mEq },
-                           { "dessin.png", find ("Pompe Dessinee"), MonSyntheEditor::mDraw } };
+    const Shot shots[] = { { "osc.png", find ("Reese Noir"), 0 },
+                           { "filtre2.png", find ("Chorale A-E-I-O-U"), 8 },
+                           { "rack.png", find ("Fold Bass"), 22 },
+                           { "matrice.png", find ("Reese Noir"), 23 },
+                           { "eq.png", find ("Shimmer Pad"), 20 },
+                           { "dessin.png", find ("Pompe Dessinee"), 14 } };
 
     std::unique_ptr<juce::AudioProcessorEditor> base (proc.createEditor());
     auto* ed = dynamic_cast<MonSyntheEditor*> (base.get());
