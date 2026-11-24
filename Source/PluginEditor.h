@@ -294,6 +294,7 @@ public:
     explicit MonSyntheEditor (MonSyntheProcessor&);
     ~MonSyntheEditor() override;
 
+    void showMenuForSnapshot (int index) { selectMenu (index); }
     void paint (juce::Graphics&) override;
     void resized() override;
     void paintOverChildren (juce::Graphics&) override;
