@@ -1,62 +1,112 @@
 <div align="center">
 
 # MS1
-### WAVETABLE SYNTHESIS · SOUND DESIGN EXPERIMENT · JUCE / VST3
+### Synthé à table d'onde · VST3 & Standalone · Windows 64 bits
 
-![Status](https://img.shields.io/badge/STATUS-EXPERIMENTAL_TEST_BUILD-EF343E?style=for-the-badge&labelColor=10151E)
-![JUCE](https://img.shields.io/badge/ENGINE-C%2B%2B%20%2F%20JUCE-19B9FF?style=for-the-badge&labelColor=10151E)
+![Statut](https://img.shields.io/badge/STATUT-VERSION_DE_TEST-EF343E?style=for-the-badge&labelColor=10151E)
+![JUCE](https://img.shields.io/badge/MOTEUR-C%2B%2B%20%2F%20JUCE%208-19B9FF?style=for-the-badge&labelColor=10151E)
 ![Format](https://img.shields.io/badge/FORMAT-VST3-F5C343?style=for-the-badge&labelColor=10151E)
+![Gratuit](https://img.shields.io/badge/GRATUIT-OUI-42C77A?style=for-the-badge&labelColor=10151E)
 
-**ANKS LABS // EXPERIMENTAL AUDIO DEVELOPMENT**
+**ANKS Labs**
 
-[![Build artifacts](https://img.shields.io/badge/GITHUB_ACTIONS-BUILD_ARTIFACTS-19B9FF?style=for-the-badge&labelColor=10151E)](https://github.com/olivershadd-star/MS1/actions)
+[![Builds](https://img.shields.io/badge/GITHUB_ACTIONS-TELECHARGER_LE_BUILD-19B9FF?style=for-the-badge&labelColor=10151E)](https://github.com/olivershadd-star/MS1/actions)
+
+<img src="docs/MS1_interface.png" alt="Interface et caractéristiques de MS1" width="800">
 
 </div>
 
 ---
 
-> **Current status: experimental / test build.** MS1 is a development and sound-design prototype, not a finished or stable product. Compilation artifacts depend on successful GitHub Actions runs and their retention period.
+> **Statut : version de test.** MS1 est un synthétiseur complet mais encore en développement. Il est fait pour être joué, tordu et massacré (techno, indus, sound design), pas pour être « propre ». Des bugs et des niveaux à ajuster sont possibles : les retours sont les bienvenus.
 
-## 01 // THE IDEA
+## Présentation
 
-**MS1** started with a sound-design question: what would an original experimental synthesizer feel like if it explored some of the *musical approaches* associated with both **Massive** and **Serum** — modulation, oscillator layering, wavetable movement and quick experimentation — within a new, compact instrument?
+MS1 est un synthé à table d'onde, **léger et gratuit**, pensé pour faire vite des sons puissants dans Ableton Live (ou n'importe quelle autre hôte VST3). Il s'inspire de l'esprit de Massive et de Serum (oscillateurs, modulation partout, effets) mais reste compact, avec des menus plutôt qu'un mur de potards.
 
-The goal is **not** to reproduce those synthesizers or copy their proprietary code or interfaces. MS1 is an independent **C++ / JUCE** learning and experimentation project developed within **ANKS Labs**.
+Il est écrit en C++ avec JUCE par **ANKS Labs**, sans reprendre ni code ni interface d'un autre produit.
 
-## 02 // FEATURES PRESENTED IN THE PROJECT
+## Ce que fait MS1
 
-| Area | Function |
+### Sources
+- **2 oscillateurs à table d'onde** (A et B), avec tables d'usine et **tables utilisateur** (fichiers WAV).
+- **Sub**, **bruit**, et **corde** (Karplus-Strong).
+- **FM** et **modulation en anneau** entre A et B.
+- **Unison**, **drive** avant filtre.
+- **Resample** : MS1 s'enregistre lui-même et réinjecte le résultat comme table d'onde.
+
+### Filtres
+- **Filtre 1** et **filtre 2**, en série ou en parallèle.
+- Le filtre 2 a un mode **formants** (voyelles).
+- **Distorsion par voix** après les filtres.
+
+### Modulation
+- **Enveloppe d'amplitude** et **enveloppe de modulation**.
+- **4 LFO** (formes, vitesse libre ou synchro).
+- **LFO dessiné** : tu traces la forme à la souris (32 points), avec formes prédéfinies et synchro.
+- **4 macros**.
+- **Matrice de modulation à 12 slots** : 17 sources vers 23 cibles.
+
+### Effets
+- Chaîne globale : **chorus / flanger → phaser → delay → reverb → EQ 8 bandes**.
+- **Rack FX à 4 emplacements** (ordre modifiable) avec 20 effets :
+
+| Famille | Effets |
 |:--|:--|
-| **Sound source** | Wavetable synthesis |
-| **Oscillator voicing** | Unison |
-| **Filtering** | Filter module |
-| **Modulation** | LFO and modulation envelope |
-| **Rhythm** | Step sequencer |
-| **Sound management** | Preset bank |
-| **Plugin format** | VST3 via JUCE |
+| Dégradation et couleur | Bitcrusher, Lo-Fi, Waveshaper, Exciter |
+| Modulation | Ring mod, Décaleur de fréquence, Rotary, Pan/Trémolo, Autowah |
+| Filtres et résonances | Résonateur, Formants, Bande |
+| Rythme et espace | Gate, Stutter, Shimmer, Imager |
+| Dynamique | Limiteur, Compresseur, Glue, Maximizer |
 
-The precise synthesis behavior, usability and compatibility remain subject to further development and testing.
+- Fin de chaîne : compresseur, largeur stéréo, master, limiteur.
 
-## 03 // TEST BUILDS
+### Jeu
+- **Séquenceur pas à pas** (jusqu'à 64 pas, 4 mesures).
+- **213 presets d'usine**, niveaux calibrés.
+- **MIDI learn** sur n'importe quel potard.
 
-Builds are generated through **[GitHub Actions](https://github.com/olivershadd-star/MS1/actions)**. When a build succeeds and the artifact is still available, the workflow can provide an `MS1.vst3` file in its **Artifacts** section.
+## Installation
 
-An Actions artifact is a **test result**, not necessarily a vetted release.
+1. Ouvre l'onglet **[Actions](https://github.com/olivershadd-star/MS1/actions)** du dépôt.
+2. Choisis le dernier build vert (workflow **Build VST3**).
+3. Télécharge l'artefact **MS1-VST3-Windows** (il faut être connecté à GitHub).
+4. Décompresse et copie le dossier `MS1.vst3` dans `C:\Program Files\Common Files\VST3`.
+5. Relance la détection des plugins dans ton hôte (Ableton : *Préférences → Plug-ins → Rescan*). Le plugin apparaît sous l'éditeur **ANKS Labs**.
 
-## 04 // DEVELOPMENT DIRECTION
+Un artefact est un build de test : il expire au bout de quelques semaines. Prérequis : Windows 64 bits, hôte compatible VST3. Le mode Standalone est aussi compilé.
 
-- [x] Establish an initial JUCE VST3 synth architecture
-- [x] Integrate wavetable, unison, filter and modulation concepts in the project
-- [x] Add step sequencer and preset-bank functionality
-- [ ] Continue sound-design and usability experiments
-- [ ] Validate the plugin in a real DAW on the target Windows setup
-- [ ] Publish a release only after the intended testing criteria are met
+## Raccourcis et ergonomie
 
-## 05 // CODE & RIGHTS
+Survole un potard avec la souris : sa **valeur réelle** s'affiche dans la barre du bas.
 
-**ANKS Labs** experimental project. Making a repository public does not by itself grant a licence to reuse its code; check the repository's licence and the applicable **JUCE** terms before redistribution.
+| Action | Effet |
+|:--|:--|
+| `Haut` / `Bas` | Une unité (1, 0,1 ou 0,01 selon l'étendue). `Maj` : x10 |
+| `Gauche` / `Droite` | Réglage fin : 0,25 % de la course. `Maj` : 2,5 % |
+| Clic droit sur un potard | Entrer une valeur, valeur par défaut, **MIDI learn**, modulation rapide (macros, LFO, enveloppes) |
+| `Tab` / `Maj+Tab` | Menu suivant / précédent |
+| `Page haut` / `Page bas` | Preset précédent / suivant |
+| `Echap` | Annule un MIDI learn |
+| `<` `>` dans le rack FX | Changer l'ordre des 4 emplacements |
 
-**Massive**, **Serum** and related brand names belong to their respective owners. MS1 is not affiliated with those products.
+**MIDI learn** : clic droit sur un potard, puis bouge un contrôleur MIDI. Le CC est mémorisé dans `ANKS Labs/MS1/midimap.txt` et vaut pour tous les projets.
+
+Dans certains hôtes, le clavier de l'ordinateur ne parvient pas toujours à la fenêtre du plugin. Clique d'abord dans l'interface.
+
+## Pour les développeurs
+
+- Code dans `Source/`, projet CMake (JUCE 8.0.4, récupéré à la compilation).
+- Compilation locale : `cmake -B build -A x64` puis `cmake --build build --config Release`.
+- Workflows GitHub Actions :
+  - **Build VST3** : compile le plugin.
+  - **Preset check** : mesure chaque preset (niveau, silence, saturation).
+  - **Snapshot** : génère des captures de l'interface.
+- Les presets d'usine sont générés dans `Source/FactoryBank.cpp`.
+
+## Droits et licence
+
+Projet **ANKS Labs**, distribué librement et gratuitement. Rendre un dépôt public n'accorde pas à lui seul de licence de réutilisation : vérifie la licence du dépôt et les conditions de **JUCE** avant toute redistribution. *Massive*, *Serum* et les noms associés appartiennent à leurs propriétaires ; MS1 n'a aucun lien avec ces produits.
 
 ---
 
@@ -64,16 +114,6 @@ An Actions artifact is a **test result**, not necessarily a vetted release.
 
 **BUILD. BREAK. REWIRE. LISTEN.**
 
-[![ANKS LABS](https://img.shields.io/badge/ANKS_LABS-PROFILE-19B9FF?style=for-the-badge&labelColor=10151E)](https://github.com/olivershadd-star)
+[![ANKS LABS](https://img.shields.io/badge/ANKS_LABS-PROFIL-19B9FF?style=for-the-badge&labelColor=10151E)](https://github.com/olivershadd-star)
 
 </div>
-
-## Raccourcis et ergonomie
-
-- **Survol d'un potard** : la valeur réelle s'affiche dans la barre du séquenceur.
-  - `Haut` / `Bas` : une unité (1, 0,1 ou 0,01 selon l'étendue du réglage) ; `Maj` : x10.
-  - `Gauche` / `Droite` : réglage fin, 0,25 % de la course ; `Maj` : 2,5 %.
-- **Clic droit sur un potard** : entrer une valeur, valeur par défaut, **MIDI learn** (le CC est mémorisé dans `ANKS Labs/MS1/midimap.txt`, valable pour tous les projets), modulation rapide (macros, LFO, enveloppes).
-- `Tab` / `Maj+Tab` : menu suivant / précédent. `Page haut` / `Page bas` : preset précédent / suivant. `Echap` : annule un MIDI learn.
-- Rack FX : `<` `>` pour changer l'ordre des 4 emplacements.
-- Mesure des presets : lancer le workflow « Preset check » (niveau, silence, saturation de chaque preset).
