@@ -479,6 +479,8 @@ const MonSyntheEditor::MenuDef& MonSyntheEditor::menuAt (int index)
         { "LFO 3-4",   1, VizLfo3, VizLfo4,       { { "lfo3Rate", "VITESSE" }, { nullptr, nullptr },
                                                     { nullptr, nullptr }, { nullptr, nullptr },
                                                     { "lfo4Rate", "VITESSE" } } },
+        { "DESSIN",    3, VizNone, VizNone,       { { "dwRate", "VITESSE" }, { "dwSmooth", "LISSAGE" },
+                                                    { "dwSteps", "PAS" } } },
         { "JEU",       2, VizGlide, VizSpectrum,  { { "glide", "GLIDE" }, { "bendRange", "BEND" } } },
         { "CHORUS",    3, VizChorus, VizSpectrum, { { "chorusMix", "MIX" }, { "chorusRate", "VITESSE" },
                                                     { "chorusDepth", "PROFONDEUR" }, { nullptr, nullptr },
@@ -583,6 +585,7 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     setupCombo (tableA, "tableA", 0);        setupCombo (warpA, "warpModeA", 0);
     setupCombo (tableB, "tableB", 1);        setupCombo (warpB, "warpModeB", 1);
     setupCombo (filterType, "filterType", 4);
+    setupCombo (dwSync, "dwSync", 3);
     setupCombo (f2Type, "f2Type", 1);        setupCombo (f2Mode, "f2Mode", 1);
     setupCombo (lfoShape, "lfoShape", 1);    setupCombo (lfoSync, "lfoSync", 1);
     setupCombo (lfo2Shape, "lfo2Shape", 2);  setupCombo (lfo2Sync, "lfo2Sync", 2);
@@ -631,6 +634,20 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     addAndMakeVisible (eqTypeBox);
 
     setupRack();
+
+    // --- LFO dessiné
+    addChildComponent (drawView);
+    {
+        const char* names[5] = { "RAMPE", "SINUS", "ALEA", "ESCALIER", "PLAT" };
+        for (int i = 0; i < 5; ++i)
+        {
+            auto& b = drawShapeButtons[(size_t) i];
+            b.setButtonText (names[i]);
+            b.setClickingTogglesState (false);
+            styleButton (b, 3);
+            b.onClick = [this, i] { drawView.setShape (i); };
+        }
+    }
 
     // --- Matrice
     for (int i = 0; i < 12; ++i)
@@ -912,6 +929,10 @@ void MonSyntheEditor::updateMenuVisibility()
     resampleAButton.setVisible (currentMenu == mOscA);
     resampleBButton.setVisible (currentMenu == mOscB);
     filterType.box.setVisible (currentMenu == mFilter);
+    drawView.setVisible (currentMenu == mDraw);
+    dwSync.box.setVisible (currentMenu == mDraw);
+    for (auto& b : drawShapeButtons)
+        b.setVisible (currentMenu == mDraw);
     f2Type.box.setVisible (currentMenu == mFilter2);
     f2Mode.box.setVisible (currentMenu == mFilter2);
     lfoShape.box.setVisible (currentMenu == mLfo);
@@ -1021,6 +1042,15 @@ void MonSyntheEditor::updateLeds()
             case mString: lvl = pv ("strLevel") > 0.01f ? 0.35f + 0.65f * pulse (2.0, 0.0) : 0.12f;  break;
             case mNoise:  lvl = pv ("noiseLevel") > 0.01f ? 0.3f + 0.7f * pulse (5.0, 0.0) : 0.12f;  break;
             case mPitch:  lvl = std::abs (pv ("pitchEnvAmt")) > 0.5f ? (active ? 1.0f : 0.6f) : 0.12f;  break;
+            case mDraw:
+            {
+                int used = 0;
+                for (int r = 1; r <= 12; ++r)
+                    if ((int) pv (("mx" + juce::String (r) + "Src").toRawUTF8()) == 16 && std::abs (pv (("mx" + juce::String (r) + "Amt").toRawUTF8())) > 0.01f)
+                        ++used;
+                lvl = used > 0 ? 0.4f + 0.6f * pulse (juce::jmin (8.0, (double) pv ("dwRate")), 0.0) : 0.12f;
+                break;
+            }
             case mFilter2: lvl = (int) pv ("f2Type") > 0 ? (active ? 0.35f + 0.65f * pulse (2.6, 1.5) : 0.6f) : 0.12f;  break;
             case mFilter: lvl = active ? 0.35f + 0.65f * pulse (2.1, 0.5) : 0.12f;     break;
             case mDisto:  lvl = pv ("distAmt") > 0.01f ? 0.4f + 0.6f * pulse (7.0, 0.0) : 0.12f;  break;
@@ -1163,6 +1193,7 @@ void MonSyntheEditor::resized()
             tableA.box.setBounds (first);       warpA.box.setBounds (second);       importAButton.setBounds (t1);  resampleAButton.setBounds (t2);
             tableB.box.setBounds (first);       warpB.box.setBounds (second);       importBButton.setBounds (t1);  resampleBButton.setBounds (t2);
             filterType.box.setBounds (first);
+            dwSync.box.setBounds (first);
             f2Type.box.setBounds (first);       f2Mode.box.setBounds (second);
             lfoShape.box.setBounds (first);     lfoSync.box.setBounds (second);
             lfo3Shape.box.setBounds (first);    lfo3Sync.box.setBounds (second);
@@ -1191,6 +1222,11 @@ void MonSyntheEditor::resized()
         eqBandButtons[(size_t) i].setBounds (R (194 + i * 101, 332, 97, 28));
     eqOnButton.setBounds (R (632, 384, 160, 34));
     eqTypeBox.setBounds (R (632, 430, 160, 30));
+
+    // LFO dessiné : zone de dessin sur les deux écrans, boutons de formes dans la bande du bas
+    drawView.setBounds (gfxA.getUnion (gfxB));
+    for (int i = 0; i < 5; ++i)
+        drawShapeButtons[(size_t) i].setBounds (R (352 + i * 110, 332, 104, 28));
 
     // Rack : 4 colonnes sur les deux écrans
     for (int s = 0; s < 4; ++s)
@@ -1313,6 +1349,8 @@ void MonSyntheEditor::timerCallback()
     repaint (gfxB);
     if (currentMenu == mEq)
         repaint (eqGraphArea);
+    if (currentMenu == mDraw)
+        drawView.repaint();
     repaint (meterArea.expanded (S (4.0f)));
     repaint (ledsArea.expanded (S (4.0f)));
     repaint (seqPanel.withHeight (S (26.0f)));
@@ -1550,6 +1588,12 @@ void MonSyntheEditor::paint (juce::Graphics& g)
                                   (float) matrixArea.getX(), (float) matrixArea.getRight());
             g.setColour (Pal::dim);
         }
+    }
+    else if (currentMenu == mDraw)
+    {
+        drawPanel (g, screenAPanel.getUnion (screenBPanel),
+                   "LFO DESSINE   //   dessine la courbe a la souris (clic droit : remet a zero)   -   source DESSIN dans la matrice",
+                   Pal::role (menuAt (currentMenu).role));
     }
     else if (currentMenu == mRack)
     {
@@ -3174,4 +3218,106 @@ void MonSyntheEditor::drawFilter2Viz (juce::Graphics& g, juce::Rectangle<float> 
     g.drawText (juce::String (names[juce::jlimit (0, 5, type)]) + (par ? "  //  PARALLELE" : "  //  SERIE")
                     + "   (courbe = filtre 1 + filtre 2)",
                 r.removeFromTop (14.0f * scale), juce::Justification::centredLeft, false);
+}
+
+//==============================================================================
+// LFO dessiné
+//==============================================================================
+void DrawLfoView::setPoint (int index, float value)
+{
+    if (auto* p = proc.apvts.getParameter ("draw" + juce::String (index + 1)))
+        p->setValueNotifyingHost (p->convertTo0to1 (juce::jlimit (-1.0f, 1.0f, value)));
+}
+
+void DrawLfoView::setShape (int kind)
+{
+    juce::Random rng;
+    for (int i = 0; i < 32; ++i)
+    {
+        const float t = (float) i / 31.0f;
+        float v = 0.0f;
+        switch (kind)
+        {
+            case 0:  v = 1.0f - 2.0f * t; break;
+            case 1:  v = std::sin (juce::MathConstants<float>::twoPi * t); break;
+            case 2:  v = rng.nextFloat() * 2.0f - 1.0f; break;
+            case 3:  v = -1.0f + 2.0f * (float) (i / 4) / 7.0f; break;
+            default: v = 0.0f; break;
+        }
+        setPoint (i, v);
+    }
+}
+
+void DrawLfoView::paintAt (const juce::MouseEvent& e)
+{
+    const int n = juce::jlimit (2, 32, (int) std::round (proc.apvts.getRawParameterValue ("dwSteps")->load()));
+    const float w = (float) getWidth(), h = (float) getHeight();
+    const int idx = juce::jlimit (0, n - 1, (int) (e.position.x / w * (float) n));
+    const float val = e.mods.isPopupMenu() ? 0.0f : 1.0f - 2.0f * juce::jlimit (0.0f, 1.0f, e.position.y / h);
+
+    if (lastIdx >= 0 && std::abs (idx - lastIdx) > 1)         // trait continu si la souris saute des pas
+    {
+        const int a = juce::jmin (idx, lastIdx), b = juce::jmax (idx, lastIdx);
+        for (int i = a; i <= b; ++i)
+            setPoint (i, lastVal + (val - lastVal) * (float) (i - lastIdx) / (float) (idx - lastIdx));
+    }
+    else
+        setPoint (idx, val);
+
+    lastIdx = idx;
+    lastVal = val;
+    repaint();
+}
+
+void DrawLfoView::paint (juce::Graphics& g)
+{
+    const auto r = getLocalBounds().toFloat();
+    const auto col = Pal::role (3);
+    const int n = juce::jlimit (2, 32, (int) std::round (proc.apvts.getRawParameterValue ("dwSteps")->load()));
+    const float smooth = proc.apvts.getRawParameterValue ("dwSmooth")->load();
+
+    g.setColour (Pal::bg.withAlpha (0.6f));
+    g.fillRect (r);
+    g.setColour (Pal::line);
+    g.drawHorizontalLine ((int) r.getCentreY(), r.getX(), r.getRight());
+    for (int i = 0; i <= n; ++i)
+    {
+        const float x = r.getX() + r.getWidth() * (float) i / (float) n;
+        g.setColour (Pal::line.withAlpha (i % 4 == 0 ? 0.9f : 0.4f));
+        g.drawVerticalLine ((int) x, r.getY(), r.getBottom());
+    }
+
+    auto yOf = [&] (float v) { return r.getY() + r.getHeight() * (1.0f - v) * 0.5f; };
+    float val[33];
+    for (int i = 0; i < n; ++i)
+        val[i] = proc.apvts.getRawParameterValue ("draw" + juce::String (i + 1))->load();
+    val[n] = val[0];
+
+    // barres des pas
+    for (int i = 0; i < n; ++i)
+    {
+        const float x0 = r.getX() + r.getWidth() * (float) i / (float) n;
+        const float x1 = r.getX() + r.getWidth() * (float) (i + 1) / (float) n;
+        const float y = yOf (val[i]), y0 = yOf (0.0f);
+        g.setColour (col.withAlpha (0.22f));
+        g.fillRect (juce::Rectangle<float> (x0 + 1.0f, juce::jmin (y, y0), x1 - x0 - 2.0f, std::abs (y - y0)));
+    }
+
+    // courbe réellement produite (même formule que dans la voix)
+    juce::Path line;
+    const int pts = 240;
+    for (int k = 0; k <= pts; ++k)
+    {
+        const float ph = (float) k / (float) pts;
+        const float x = ph * (float) n * 0.99999f;
+        const int i0 = juce::jmin (n - 1, (int) x);
+        const float fr = x - (float) i0;
+        const float a = val[i0], b = val[i0 + 1];
+        const float t = smooth <= 0.001f ? 0.0f : juce::jlimit (0.0f, 1.0f, (fr - (1.0f - smooth)) / smooth);
+        const float v = a + (b - a) * (t * t * (3.0f - 2.0f * t));
+        const float px = r.getX() + r.getWidth() * ph;
+        if (k == 0) line.startNewSubPath (px, yOf (v)); else line.lineTo (px, yOf (v));
+    }
+    g.setColour (col);
+    g.strokePath (line, juce::PathStrokeType (2.0f));
 }

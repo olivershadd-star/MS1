@@ -231,6 +231,8 @@ private:
     std::array<std::array<float, 4096>, 2> combBuf {};      // filtre en peigne (COMB)
     int combPos = 0;
     double lfo4Phase = 0.0;
+    double drawPhase = 0.0;
+    std::array<std::atomic<float>*, 32> drawParams {};   // courbe dessinée (32 points)
     juce::Random rng;
 
     // Bruit, enveloppe de hauteur, distorsion

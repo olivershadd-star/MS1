@@ -360,6 +360,8 @@ SynthVoice::SynthVoice (juce::AudioProcessorValueTreeState& state, const Wavetab
         mixParams[(size_t) (s * 3 + 1)] = apvts.getRawParameterValue (n + "Dst");
         mixParams[(size_t) (s * 3 + 2)] = apvts.getRawParameterValue (n + "Amt");
     }
+    for (int i = 0; i < 32; ++i)
+        drawParams[(size_t) i] = apvts.getRawParameterValue ("draw" + juce::String (i + 1));
 }
 
 void SynthVoice::prepare (double sampleRate, int blockSize)
@@ -465,6 +467,7 @@ void SynthVoice::startNote (int midiNote, float vel, juce::SynthesiserSound*, in
     lfo2Phase = 0.0;
     lfo3Phase = 0.0;
     lfo4Phase = 0.0;
+    drawPhase = 0.0;
     for (auto& b : combBuf)
         b.fill (0.0f);
     combPos = 0;
@@ -659,6 +662,9 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     const double lfo3Inc   = lfoIncrement (param ("lfo3Rate"), (int) param ("lfo3Sync"));
     const int    lfo4Shape = (int) param ("lfo4Shape");
     const double lfo4Inc   = lfoIncrement (param ("lfo4Rate"), (int) param ("lfo4Sync"));
+    const double drawInc   = lfoIncrement (param ("dwRate"), (int) param ("dwSync"));
+    const int    drawSteps = juce::jlimit (2, 32, (int) std::round (param ("dwSteps")));
+    const float  drawSmooth = param ("dwSmooth");
     const std::array<float, 4> macros { param ("macro1"), param ("macro2"), param ("macro3"), param ("macro4") };
 
     // --- Tables
@@ -774,16 +780,31 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         if (lfo4Phase >= 1.0)
             lfo4Phase -= 1.0;
 
+        // LFO dessiné : 2 à 32 pas, du escalier (lissage 0) à la rampe continue (lissage 1)
+        float drawVal;
+        {
+            const double x = drawPhase * (double) drawSteps;
+            const int i0 = juce::jmin (drawSteps - 1, (int) x);
+            const float fr = (float) (x - (double) i0);
+            const float a = drawParams[(size_t) i0]->load();
+            const float b = drawParams[(size_t) ((i0 + 1) % drawSteps)]->load();
+            const float t = drawSmooth <= 0.001f ? 0.0f : juce::jlimit (0.0f, 1.0f, (fr - (1.0f - drawSmooth)) / drawSmooth);
+            drawVal = a + (b - a) * (t * t * (3.0f - 2.0f * t));
+            drawPhase += drawInc;
+            if (drawPhase >= 1.0)
+                drawPhase -= 1.0;
+        }
+
         const float mEnv = modEnv.getNextSample();
         const float fEnv = fltEnv.getNextSample();
 
-        std::array<float, 16> src {};
+        std::array<float, 17> src {};
         src[1] = lfo;  src[2] = mEnv;  src[3] = fEnv;  src[4] = velocity;
         src[5] = keyNorm;  src[6] = wheel;  src[7] = noteRandom;
         src[8] = lfo2;
         src[9] = macros[0];  src[10] = macros[1];  src[11] = macros[2];  src[12] = macros[3];
         src[13] = pitchEnvVal;
-        src[14] = lfo3;  src[15] = lfo4;
+        src[14] = lfo3;  src[15] = lfo4;  src[16] = drawVal;
 
         std::array<float, 23> tgt {};
         for (int s = 0; s < numSlots; ++s)
@@ -1178,6 +1199,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
 
     // Filtre
     addChoice ("filterType", "Filtre Type", StringArray { "LP 12", "LP 24", "HP", "BP", "NOTCH", "COMB" }, 0);
+    // LFO dessiné
+    addFloat  ("dwRate",   "Dessin Vitesse (Hz)", NormalisableRange<float> (0.05f, 20.0f, 0.0f, 0.4f), 1.0f);
+    addChoice ("dwSync",   "Dessin Sync", lfoSyncNames(), 0);
+    addFloat  ("dwSmooth", "Dessin Lissage", NormalisableRange<float> (0.0f, 1.0f), 0.0f);
+    addFloat  ("dwSteps",  "Dessin Pas", NormalisableRange<float> (2.0f, 32.0f, 1.0f), 16.0f);
+    for (int i = 1; i <= 32; ++i)
+        addFloat (("draw" + String (i)).toRawUTF8(), ("Dessin " + String (i)).toRawUTF8(),
+                  NormalisableRange<float> (-1.0f, 1.0f), 1.0f - 2.0f * (float) (i - 1) / 31.0f);
+
     addChoice ("f2Type", "Filtre 2 Type", StringArray { "OFF", "LP 12", "HP", "BP", "NOTCH", "FORMANTS" }, 0);
     addChoice ("f2Mode", "Filtre 2 Mode", StringArray { "SERIE", "PARALLELE" }, 0);
     addFloat  ("f2Cutoff", "Filtre 2 Cutoff", NormalisableRange<float> (20.0f, 20000.0f, 0.0f, 0.3f), 1000.0f);
@@ -2299,7 +2329,7 @@ juce::StringArray MonSyntheProcessor::lfoSyncNames()
 juce::StringArray MonSyntheProcessor::modSourceNames()
 {
     return { "---", "LFO", "ENV MOD", "ENV FILTRE", "VELOCITE", "NOTE", "MOLETTE", "ALEA",
-             "LFO 2", "MACRO 1", "MACRO 2", "MACRO 3", "MACRO 4", "ENV PITCH", "LFO 3", "LFO 4" };
+             "LFO 2", "MACRO 1", "MACRO 2", "MACRO 3", "MACRO 4", "ENV PITCH", "LFO 3", "LFO 4", "DESSIN" };
 }
 
 juce::StringArray MonSyntheProcessor::modTargetNames()

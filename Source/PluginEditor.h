@@ -206,6 +206,26 @@ private:
 
 //==============================================================================
 // Analyseur de spectre de la sortie, en segments
+// Zone où l'on dessine la courbe du LFO dessiné (32 points au plus) à la souris
+class DrawLfoView : public juce::Component
+{
+public:
+    explicit DrawLfoView (MonSyntheProcessor& p) : proc (p) {}
+
+    void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent& e) override { lastIdx = -1; paintAt (e); }
+    void mouseDrag (const juce::MouseEvent& e) override { paintAt (e); }
+    void setShape (int kind);      // 0 rampe, 1 sinus, 2 aléatoire, 3 escalier, 4 plat
+
+private:
+    void paintAt (const juce::MouseEvent&);
+    void setPoint (int index, float value);
+
+    MonSyntheProcessor& proc;
+    int lastIdx = -1;
+    float lastVal = 0.0f;
+};
+
 class SpectrumView : public juce::Component
 {
 public:
@@ -306,7 +326,7 @@ private:
 
     enum Viz { VizNone = 0, VizScopeA, VizUnison, VizScopeB, VizFmRing, VizFilter,
                VizEnvFilter, VizEnvAmp, VizEnvMod, VizLfo1, VizLfo2, VizLfo3, VizLfo4, VizGlide,
-               VizChorus, VizDelay, VizReverb, VizMatrix, VizSpectrum, VizNoise, VizPitch, VizDisto, VizComp, VizString, VizFilter2 };
+               VizChorus, VizDelay, VizReverb, VizMatrix, VizSpectrum, VizNoise, VizPitch, VizDisto, VizComp, VizString, VizFilter2, VizDraw };
 
     struct ParamSlot { const char* id; const char* label; };
     struct MenuDef   { const char* name; int role; int vizA; int vizB; ParamSlot p[8]; };
@@ -317,9 +337,9 @@ private:
 
     // L'interface est dessinée pour 1280 x 720 puis mise à l'échelle (fenêtre redimensionnable, 16:9)
     static constexpr int baseWidth = 1280, baseHeight = 720;
-    static constexpr int numMenus = 23, matrixMenu = 22;
+    static constexpr int numMenus = 24, matrixMenu = 23;
     enum MenuId { mOscA = 0, mOscB, mFmRing, mUnison, mNoise, mString, mPitch, mFilter, mFilter2, mDisto, mEnvAmp, mEnvMod,
-                  mLfo, mLfo34, mJeu, mChorus, mPhaser, mDelay, mReverb, mEq, mMaster, mRack, mMatrix };
+                  mLfo, mLfo34, mDraw, mJeu, mChorus, mPhaser, mDelay, mReverb, mEq, mMaster, mRack, mMatrix };
 
     static const MenuDef& menuAt (int index);
 
@@ -390,7 +410,7 @@ private:
     std::array<Knob*, 12> mixAmt {};
 
     NamedCombo tableA, tableB, warpA, warpB, filterType, lfoShape, lfoSync, lfo2Shape, lfo2Sync, lfo3Shape, lfo3Sync, lfo4Shape, lfo4Sync, delaySync, delayMode,
-               noiseType, phaseMode, distType, f2Type, f2Mode;
+               noiseType, phaseMode, distType, f2Type, f2Mode, dwSync;
     juce::TextButton monoButton;
     std::unique_ptr<APVTS::ButtonAttachment> monoAttachment;
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> captions;
@@ -442,6 +462,8 @@ private:
 
     // EQ 8 bandes
     std::array<juce::TextButton, 8> eqBandButtons;
+    DrawLfoView drawView { proc };
+    std::array<juce::TextButton, 5> drawShapeButtons;
     juce::TextButton eqOnButton { "BANDE ON" };
     juce::ComboBox eqTypeBox;
     std::unique_ptr<APVTS::ButtonAttachment> eqOnAtt;
