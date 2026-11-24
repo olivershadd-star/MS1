@@ -2594,7 +2594,7 @@ void MonSyntheEditor::drawEq (juce::Graphics& g)
 int MonSyntheEditor::modTargetForParam (const juce::String& id)
 {
     static const std::pair<const char*, int> map[] = {
-        { "position", 1 }, { "oscBPos", 2 }, { "cutoff", 3 }, { "resonance", 4 }, { "detune", 6 },
+        { "position", 1 }, { "oscBPos", 2 }, { "cutoff", 3 }, { "resonance", 4 }, { "f2Cutoff", 21 }, { "f2Vowel", 22 }, { "detune", 6 },
         { "oscBLevel", 7 }, { "drive", 8 }, { "modAmount", 11 }, { "warpAmtA", 14 }, { "warpAmtB", 15 },
         { "fmAmount", 16 }, { "ringAmount", 17 }, { "distAmt", 18 }, { "noiseLevel", 19 }, { "fltEnvAmount", 10 }
     };
@@ -3074,4 +3074,104 @@ void MonSyntheEditor::startResample (int slot)
     proc.startResample();
     statusMessage = "RESAMPLE : JOUE ET TIENS UNE NOTE...";
     statusFrames = 30;
+}
+
+void MonSyntheEditor::drawFilter2Viz (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour colour)
+{
+    const int type = (int) pv ("f2Type");
+    const float fc = pv ("f2Cutoff");
+    const float res = pv ("f2Res");
+    const float mix = pv ("f2Mix");
+    const bool par = pv ("f2Mode") > 0.5f;
+    static const char* names[] = { "OFF", "LP 12", "HP", "BP", "NOTCH", "FORMANTS" };
+    static const float vw[5][3] = { { 800.0f, 1150.0f, 2900.0f }, { 400.0f, 1600.0f, 2700.0f }, { 350.0f, 1700.0f, 2700.0f },
+                                    { 450.0f, 800.0f, 2830.0f }, { 325.0f, 700.0f, 2700.0f } };
+
+    // filtre 1 (réponse simplifiée)
+    const float fc1 = pv ("cutoff"), q1 = juce::jmax (0.3f, pv ("resonance"));
+    const int t1 = (int) pv ("filterType");
+    auto mag1 = [&] (float f)
+    {
+        const float x = f / fc1, x2 = x * x;
+        const float d = std::sqrt ((1.0f - x2) * (1.0f - x2) + x2 / (q1 * q1));
+        switch (t1)
+        {
+            case 0:  return 1.0f / d;
+            case 1:  return 1.0f / (d * d);
+            case 2:  return x2 / d;
+            case 4:  return std::abs (1.0f - x2) / d;
+            case 5:  return 0.5f;
+            default: return (x / q1) / d;
+        }
+    };
+
+    const float pos = juce::jlimit (0.0f, 1.0f, pv ("f2Vowel")) * 4.0f;
+    const int i0 = juce::jlimit (0, 3, (int) pos);
+    const float fr = pos - (float) i0;
+    const float shift = juce::jlimit (0.25f, 4.0f, fc / 1000.0f);
+    const float q2 = type == 5 ? 2.0f + res * 2.5f : juce::jmax (0.3f, res);
+
+    auto mag2 = [&] (float f)
+    {
+        if (type == 5)
+        {
+            float s = 0.0f;
+            const float gains[3] = { 1.6f, 1.2f, 0.8f };
+            for (int k = 0; k < 3; ++k)
+            {
+                const float c = (vw[i0][k] * (1.0f - fr) + vw[i0 + 1][k] * fr) * shift;
+                const float x = f / c, x2 = x * x;
+                const float d = std::sqrt ((1.0f - x2) * (1.0f - x2) + x2 / (q2 * q2));
+                s += gains[k] * (x / q2) / d;
+            }
+            return s;
+        }
+        const float x = f / fc, x2 = x * x;
+        const float d = std::sqrt ((1.0f - x2) * (1.0f - x2) + x2 / (q2 * q2));
+        switch (type)
+        {
+            case 1:  return 1.0f / d;
+            case 2:  return x2 / d;
+            case 4:  return std::abs (1.0f - x2) / d;
+            default: return (x / q2) / d;
+        }
+    };
+
+    const auto area = r.reduced (4.0f * scale, 18.0f * scale);
+    auto fx = [&] (float hz) { return area.getX() + area.getWidth() * std::log (hz / 20.0f) / std::log (1000.0f); };
+    g.setColour (Pal::line.brighter (0.4f).withAlpha (0.7f));
+    for (float hz : { 100.0f, 1000.0f, 10000.0f })
+        g.drawVerticalLine ((int) fx (hz), area.getY(), area.getBottom());
+
+    juce::Path line;
+    const int n = 140;
+    for (int i = 0; i <= n; ++i)
+    {
+        const float f = 20.0f * std::pow (1000.0f, (float) i / (float) n);
+        float m;
+        if (type == 0)
+            m = mag1 (f);
+        else if (par)
+            m = (1.0f - mix) * mag1 (f) + mix * mag2 (f);
+        else
+            m = mag1 (f) * (1.0f - mix + mix * mag2 (f));
+        const float db = juce::jlimit (-48.0f, 18.0f, juce::Decibels::gainToDecibels (m, -60.0f));
+        const float x = area.getX() + area.getWidth() * (float) i / (float) n;
+        const float y = area.getBottom() - area.getHeight() * (db + 48.0f) / 66.0f;
+        if (i == 0) line.startNewSubPath (x, y); else line.lineTo (x, y);
+    }
+
+    juce::Path fill (line);
+    fill.lineTo (area.getRight(), area.getBottom());
+    fill.lineTo (area.getX(), area.getBottom());
+    fill.closeSubPath();
+    g.setColour (colour.withAlpha (0.16f));
+    g.fillPath (fill);
+    glowStroke (g, line, colour, 2.0f * scale);
+
+    g.setFont (Pal::mono (10.5f * scale, true));
+    g.setColour (Pal::text);
+    g.drawText (juce::String (names[juce::jlimit (0, 5, type)]) + (par ? "  //  PARALLELE" : "  //  SERIE")
+                    + "   (courbe = filtre 1 + filtre 2)",
+                r.removeFromTop (14.0f * scale), juce::Justification::centredLeft, false);
 }
