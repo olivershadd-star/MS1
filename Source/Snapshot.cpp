@@ -36,6 +36,23 @@ int main()
         proc.loadFactoryPreset (s.preset);
         ed->showMenuForSnapshot (s.menu);
         ed->resized();
+
+        // on joue une note pour remplir oscilloscope et spectre, et on laisse l'interface rattraper les paramètres
+        juce::AudioBuffer<float> buf (2, 512);
+        for (int round = 0; round < 24; ++round)
+        {
+            juce::MidiBuffer midi;
+            if (round == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 48, 0.8f), 0);
+            for (int b = 0; b < 8; ++b)
+            {
+                buf.clear();
+                proc.processBlock (buf, midi);
+                midi.clear();
+            }
+            juce::MessageManager::getInstance()->runDispatchLoopUntil (40);
+        }
+        ed->resized();
         const auto img = ed->createComponentSnapshot (ed->getLocalBounds(), true, 2.0f);
         juce::File f = juce::File::getCurrentWorkingDirectory().getChildFile (s.file);
         f.deleteFile();
