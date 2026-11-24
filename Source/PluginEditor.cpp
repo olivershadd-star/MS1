@@ -1347,6 +1347,19 @@ void MonSyntheEditor::timerCallback()
     if (currentMenu == mRack)
         refreshRack();
 
+    // Survol d'un potard : valeur réelle + rappel des raccourcis
+    if (hoveredKnob != nullptr && statusFrames <= 1 && hoveredKnob->slider.isShowing() && hoveredKnob->label.getText().isNotEmpty())
+    {
+        const auto msg = hoveredKnob->label.getText() + " = " + hoveredKnob->slider.getTextFromValue (hoveredKnob->slider.getValue())
+                         + "     [haut/bas] 1 unite   [gauche/droite] fin 0,25 %   [Maj] x10   [clic droit] valeur, MIDI learn, modulation";
+        if (msg != statusMessage)
+        {
+            statusMessage = msg;
+            repaint (seqPanel);
+        }
+        statusFrames = 2;
+    }
+
     if (statusFrames > 0)
         --statusFrames;
     if (deleteArmed > 0 && --deleteArmed == 0)

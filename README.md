@@ -67,3 +67,13 @@ An Actions artifact is a **test result**, not necessarily a vetted release.
 [![ANKS LABS](https://img.shields.io/badge/ANKS_LABS-PROFILE-19B9FF?style=for-the-badge&labelColor=10151E)](https://github.com/olivershadd-star)
 
 </div>
+
+## Raccourcis et ergonomie
+
+- **Survol d'un potard** : la valeur réelle s'affiche dans la barre du séquenceur.
+  - `Haut` / `Bas` : une unité (1, 0,1 ou 0,01 selon l'étendue du réglage) ; `Maj` : x10.
+  - `Gauche` / `Droite` : réglage fin, 0,25 % de la course ; `Maj` : 2,5 %.
+- **Clic droit sur un potard** : entrer une valeur, valeur par défaut, **MIDI learn** (le CC est mémorisé dans `ANKS Labs/MS1/midimap.txt`, valable pour tous les projets), modulation rapide (macros, LFO, enveloppes).
+- `Tab` / `Maj+Tab` : menu suivant / précédent. `Page haut` / `Page bas` : preset précédent / suivant. `Echap` : annule un MIDI learn.
+- Rack FX : `<` `>` pour changer l'ordre des 4 emplacements.
+- Mesure des presets : lancer le workflow « Preset check » (niveau, silence, saturation de chaque preset).
