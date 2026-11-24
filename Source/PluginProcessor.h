@@ -276,11 +276,11 @@ private:
 };
 
 //==============================================================================
-class MonSyntheProcessor : public juce::AudioProcessor
+class MonSyntheProcessor : public juce::AudioProcessor, private juce::AsyncUpdater
 {
 public:
     MonSyntheProcessor();
-    ~MonSyntheProcessor() override = default;
+    ~MonSyntheProcessor() override { cancelPendingUpdate(); }
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -402,6 +402,26 @@ private:
     FxRack fxRack;
     std::array<std::atomic<float>*, 4 * 7> fxParams {};   // par emplacement : type, on, mix, a, b, c, d
     std::atomic<float> lastNoteHz { 0.0f };
+    // MIDI learn : un CC appris pilote un réglage (la correspondance est globale, mémorisée dans un fichier)
+public:
+    void startMidiLearn (const juce::String& paramId);
+    void cancelMidiLearn() { learnParam.store (nullptr); }
+    bool isMidiLearning() const noexcept { return learnParam.load() != nullptr; }
+    int getCcForParam (const juce::String& paramId) const;
+    void forgetCcForParam (const juce::String& paramId);
+    int takeLearnedCc() noexcept { return lastLearnedCc.exchange (-1); }       // numéro de CC qui vient d'être appris, ou -1
+    juce::String getLastLearnedParamName() const { return lastLearnedName; }
+private:
+    void handleAsyncUpdate() override { saveMidiMap(); }
+    void loadMidiMap();
+    void saveMidiMap();
+    static juce::File midiMapFile();
+    std::array<std::atomic<juce::RangedAudioParameter*>, 128> ccParam {};
+    std::atomic<juce::RangedAudioParameter*> learnParam { nullptr };
+    std::atomic<int> lastLearnedCc { -1 };
+    juce::String lastLearnedName;
+    bool midiMapLoaded = false;
+
     std::vector<float> capBuf;
     std::atomic<int> capPos { 0 }, capState { 0 };
     double capSr = 44100.0;

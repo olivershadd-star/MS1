@@ -364,6 +364,15 @@ private:
     juce::TextButton browserButton { "PRESETS" };
     void stepPreset (int delta);
 
+    // Réglage fin au clavier, MIDI learn, raccourcis
+    bool keyPressed (const juce::KeyPress&) override;
+    void mouseEnter (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
+    void showKnobMenu (Knob&);
+    void nudgeKnob (Knob&, int direction, bool fine, bool big);
+    Knob* hoveredKnob = nullptr;
+    Knob* lastKnob = nullptr;
+
     // Dessin
     void drawPanel (juce::Graphics&, juce::Rectangle<int> area, const juce::String& title, juce::Colour colour,
                     const juce::String& rightText = {});

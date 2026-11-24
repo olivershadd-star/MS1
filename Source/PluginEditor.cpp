@@ -518,6 +518,7 @@ MonSyntheEditor::Knob* MonSyntheEditor::makeKnob (const juce::String& paramId, c
     auto k = std::make_unique<Knob>();
     k->role = role;
     k->linear = linear;
+    k->paramId = paramId;
 
     auto& s = k->slider;
     s.setSliderStyle (linear ? juce::Slider::LinearHorizontal : juce::Slider::RotaryHorizontalVerticalDrag);
@@ -538,6 +539,7 @@ MonSyntheEditor::Knob* MonSyntheEditor::makeKnob (const juce::String& paramId, c
     addAndMakeVisible (s);
     addAndMakeVisible (k->label);
 
+    s.addMouseListener (this, false);
     auto* raw = k.get();
     knobs.push_back (std::move (k));
     return raw;
@@ -622,8 +624,7 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
         styleButton (b, i % 6);
         b.onClick = [this, i] { selectEqBand (i); };
     }
-    for (auto* k : fixedKnobs)
-        k->slider.addMouseListener (this, false);
+    setWantsKeyboardFocus (true);
 
     styleButton (eqOnButton, 0);
     eqOnButton.setClickingTogglesState (true);
@@ -1310,6 +1311,12 @@ void MonSyntheEditor::timerCallback()
         peak = juce::jmax (peak, std::abs (v));
     const float level = juce::jlimit (0.0f, 1.0f, (juce::Decibels::gainToDecibels (peak, -60.0f) + 60.0f) / 60.0f);
     outLevel = level > outLevel ? level : outLevel * 0.9f;
+
+    if (const int learned = proc.takeLearnedCc(); learned >= 0)
+    {
+        statusMessage = "CC " + juce::String (learned) + " -> " + proc.getLastLearnedParamName();
+        statusFrames = 200;
+    }
 
     if (resampleSlot >= 0)
     {
@@ -2426,15 +2433,16 @@ int MonSyntheEditor::eqHitTest (juce::Point<int> p) const
 
 void MonSyntheEditor::mouseDown (const juce::MouseEvent& e)
 {
-    if (e.mods.isPopupMenu())
-    {
-        for (auto* k : fixedKnobs)
-            if (e.eventComponent == &k->slider)
+    for (auto& k : knobs)
+        if (e.eventComponent == &k->slider)
+        {
+            lastKnob = k.get();
+            if (e.mods.isPopupMenu() && k->paramId.isNotEmpty())
             {
-                showModMenu (*k);
+                showKnobMenu (*k);
                 return;
             }
-    }
+        }
 
     eqDragBand = -1;
     if (currentMenu != mEq || ! eqGraphArea.contains (e.getPosition()))
@@ -2665,13 +2673,13 @@ void MonSyntheEditor::showModMenu (Knob& knob)
     menu.addSectionHeader ("MODULER  " + targets[target]);
 
     // routes déjà présentes vers cette cible
-    std::array<int, 16> slotOf {};
+    std::array<int, 17> slotOf {};
     slotOf.fill (-1);
     for (int s = 1; s <= SynthVoice::numMixSlots; ++s)
     {
         const juce::String n = "mx" + juce::String (s);
         const int src = (int) paramPlain (n + "Src");
-        if (src > 0 && src < 16 && (int) paramPlain (n + "Dst") == target && std::abs (paramPlain (n + "Amt")) > 0.001f)
+        if (src > 0 && src < 17 && (int) paramPlain (n + "Dst") == target && std::abs (paramPlain (n + "Amt")) > 0.001f)
             slotOf[(size_t) src] = s;
     }
 
@@ -2697,7 +2705,7 @@ void MonSyntheEditor::showModMenu (Knob& knob)
 
         if (result == 1)
         {
-            for (int src = 1; src < 16; ++src)
+            for (int src = 1; src < 17; ++src)
                 if (slotOf[(size_t) src] > 0)
                     clear (slotOf[(size_t) src]);
         }
@@ -3320,4 +3328,129 @@ void DrawLfoView::paint (juce::Graphics& g)
     }
     g.setColour (col);
     g.strokePath (line, juce::PathStrokeType (2.0f));
+}
+
+//==============================================================================
+// Ergonomie : menu clic droit, réglage fin au clavier, raccourcis
+//==============================================================================
+void MonSyntheEditor::showKnobMenu (Knob& knob)
+{
+    const int cc = proc.getCcForParam (knob.paramId);
+    juce::PopupMenu menu;
+    menu.addItem (10, "Entrer une valeur...");
+    menu.addItem (11, "Valeur par defaut");
+    menu.addSeparator();
+    menu.addItem (20, proc.isMidiLearning() ? "MIDI LEARN en cours : bouge un potard MIDI..." : "MIDI LEARN : assigner un potard MIDI");
+    if (cc >= 0)
+        menu.addItem (21, "Oublier le CC " + juce::String (cc));
+    menu.addSeparator();
+    menu.addItem (30, "Moduler ce reglage (macro, LFO, enveloppe)...", modTargetForParam (knob.paramId) != 0);
+
+    juce::Component::SafePointer<MonSyntheEditor> safe (this);
+    const auto id = knob.paramId;
+    auto* kp = &knob;
+    menu.showMenuAsync (juce::PopupMenu::Options(), [safe, id, kp] (int r)
+    {
+        if (safe == nullptr || r == 0)
+            return;
+        auto* ed = safe.getComponent();
+        switch (r)
+        {
+            case 10: kp->slider.showTextBox(); break;
+            case 11: kp->slider.setValue (kp->slider.getDoubleClickReturnValue(), juce::sendNotificationSync); break;
+            case 20:
+                ed->proc.startMidiLearn (id);
+                ed->statusMessage = "MIDI LEARN : bouge un potard de ton clavier MIDI (Echap pour annuler)";
+                ed->statusFrames = 600;
+                break;
+            case 21:
+                ed->proc.forgetCcForParam (id);
+                ed->statusMessage = "CC oublie";
+                ed->statusFrames = 90;
+                break;
+            case 30: ed->showModMenu (*kp); break;
+            default: break;
+        }
+    });
+}
+
+void MonSyntheEditor::mouseEnter (const juce::MouseEvent& e)
+{
+    for (auto& k : knobs)
+        if (e.eventComponent == &k->slider)
+        {
+            hoveredKnob = k.get();
+            lastKnob = k.get();
+            grabKeyboardFocus();
+            return;
+        }
+}
+
+void MonSyntheEditor::mouseExit (const juce::MouseEvent& e)
+{
+    if (hoveredKnob != nullptr && e.eventComponent == &hoveredKnob->slider)
+        hoveredKnob = nullptr;
+}
+
+void MonSyntheEditor::nudgeKnob (Knob& k, int direction, bool fine, bool big)
+{
+    auto& s = k.slider;
+    const double lo = s.getMinimum(), hi = s.getMaximum();
+    const double range = hi - lo;
+    const double interval = s.getInterval();
+    double v = s.getValue();
+
+    if (fine)
+    {
+        // 0,25 % de la course du potard (dans l'échelle réelle du potard : précis même pour les Hz)
+        const double p = juce::jlimit (0.0, 1.0, s.valueToProportionOfLength (v) + direction * (big ? 0.025 : 0.0025));
+        v = s.proportionOfLengthToValue (p);
+    }
+    else
+    {
+        // une unité affichée : 1 si la plage est grande, sinon 0,1 ou 0,01
+        double step = range >= 20.0 ? 1.0 : (range >= 2.0 ? 0.1 : 0.01);
+        if (interval > 0.0)
+            step = juce::jmax (step, interval);
+        v += direction * step * (big ? 10.0 : 1.0);
+    }
+
+    s.setValue (juce::jlimit (lo, hi, v), juce::sendNotificationSync);
+    statusMessage = k.label.getText() + " = " + s.getTextFromValue (s.getValue());
+    statusFrames = 60;
+}
+
+bool MonSyntheEditor::keyPressed (const juce::KeyPress& key)
+{
+    const bool shift = key.getModifiers().isShiftDown();
+
+    if (key == juce::KeyPress::escapeKey)
+    {
+        if (proc.isMidiLearning())
+        {
+            proc.cancelMidiLearn();
+            statusMessage = "MIDI LEARN annule";
+            statusFrames = 60;
+        }
+        return true;
+    }
+
+    if (key == juce::KeyPress::pageUpKey)   { stepPreset (-1); return true; }
+    if (key == juce::KeyPress::pageDownKey) { stepPreset (1);  return true; }
+
+    if (key == juce::KeyPress::tabKey)
+    {
+        selectMenu ((currentMenu + (shift ? numMenus - 1 : 1)) % numMenus);
+        return true;
+    }
+
+    auto* k = hoveredKnob != nullptr ? hoveredKnob : lastKnob;
+    if (k == nullptr || ! k->slider.isShowing() || ! k->slider.isEnabled())
+        return false;
+
+    if (key.isKeyCode (juce::KeyPress::upKey))    { nudgeKnob (*k, 1, false, shift);  return true; }
+    if (key.isKeyCode (juce::KeyPress::downKey))  { nudgeKnob (*k, -1, false, shift); return true; }
+    if (key.isKeyCode (juce::KeyPress::rightKey)) { nudgeKnob (*k, 1, true, shift);   return true; }
+    if (key.isKeyCode (juce::KeyPress::leftKey))  { nudgeKnob (*k, -1, true, shift);  return true; }
+    return false;
 }

@@ -1449,6 +1449,9 @@ void MonSyntheProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     }
     lastEqOut = 1.0f;
 
+    if (! midiMapLoaded)
+        loadMidiMap();
+
     fxRack.prepare (sampleRate, juce::jmax (samplesPerBlock, 8192));
     capSr = sampleRate;
     capBuf.assign ((size_t) (sampleRate * 3.0) + 1, 0.0f);
@@ -1500,6 +1503,27 @@ void MonSyntheProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     hostPpq = ppqNow;
 
     synth.setMono (param ("mono") > 0.5f);
+    // MIDI learn / correspondances CC -> réglage
+    for (const auto meta : midi)
+    {
+        const auto m = meta.getMessage();
+        if (! m.isController() || m.getControllerNumber() >= 120)
+            continue;
+        const int cc = m.getControllerNumber();
+        if (auto* lp = learnParam.exchange (nullptr))
+        {
+            for (auto& slot : ccParam)                                  // un réglage n'a qu'un seul CC
+                if (slot.load() == lp)
+                    slot.store (nullptr);
+            ccParam[(size_t) cc].store (lp);
+            lastLearnedName = lp->getName (24);
+            lastLearnedCc.store (cc);
+            triggerAsyncUpdate();
+        }
+        else if (auto* p = ccParam[(size_t) cc].load())
+            p->setValueNotifyingHost ((float) m.getControllerValue() / 127.0f);
+    }
+
     keyboardState.processNextMidiBuffer (midi, 0, numSamples, true);
     generateSequencerMidi (midi, numSamples);
     for (const auto meta : midi)
@@ -2403,4 +2427,65 @@ juce::AudioProcessorEditor* MonSyntheProcessor::createEditor()
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new MonSyntheProcessor();
+}
+
+//==============================================================================
+// MIDI learn
+//==============================================================================
+juce::File MonSyntheProcessor::midiMapFile()
+{
+    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+               .getChildFile ("ANKS Labs").getChildFile ("MS1").getChildFile ("midimap.txt");
+}
+
+void MonSyntheProcessor::startMidiLearn (const juce::String& paramId)
+{
+    learnParam.store (dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (paramId)));
+}
+
+int MonSyntheProcessor::getCcForParam (const juce::String& paramId) const
+{
+    auto* p = apvts.getParameter (paramId);
+    for (int cc = 0; cc < 128; ++cc)
+        if (p != nullptr && ccParam[(size_t) cc].load() == p)
+            return cc;
+    return -1;
+}
+
+void MonSyntheProcessor::forgetCcForParam (const juce::String& paramId)
+{
+    auto* p = apvts.getParameter (paramId);
+    for (auto& slot : ccParam)
+        if (p != nullptr && slot.load() == p)
+            slot.store (nullptr);
+    triggerAsyncUpdate();
+}
+
+void MonSyntheProcessor::saveMidiMap()
+{
+    juce::String text;
+    for (int cc = 0; cc < 128; ++cc)
+        if (auto* p = ccParam[(size_t) cc].load())
+            text << cc << "=" << p->paramID << "\n";
+    const auto f = midiMapFile();
+    f.getParentDirectory().createDirectory();
+    f.replaceWithText (text);
+}
+
+void MonSyntheProcessor::loadMidiMap()
+{
+    midiMapLoaded = true;
+    const auto f = midiMapFile();
+    if (! f.existsAsFile())
+        return;
+    for (const auto& line : juce::StringArray::fromLines (f.loadFileAsString()))
+    {
+        const int eq = line.indexOfChar ('=');
+        if (eq < 1)
+            continue;
+        const int cc = line.substring (0, eq).getIntValue();
+        if (auto* p = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (line.substring (eq + 1).trim())))
+            if (cc >= 0 && cc < 128)
+                ccParam[(size_t) cc].store (p);
+    }
 }
