@@ -39,3 +39,15 @@ target_link_libraries(MS1
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)
+
+# Outil de mesure des presets (n'est pas construit par défaut : cible PresetCheck)
+juce_add_console_app(PresetCheck PRODUCT_NAME "PresetCheck")
+target_sources(PresetCheck PRIVATE
+    Source/PresetCheck.cpp
+    Source/PluginProcessor.cpp
+    Source/PluginEditor.cpp
+    Source/FactoryBank.cpp
+    Source/FxRack.cpp)
+set_target_properties(PresetCheck PROPERTIES EXCLUDE_FROM_ALL TRUE)
+target_compile_definitions(PresetCheck PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+target_link_libraries(PresetCheck PRIVATE juce::juce_audio_utils juce::juce_dsp juce::juce_recommended_config_flags)
