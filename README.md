@@ -29,23 +29,23 @@ Il est écrit en C++ avec JUCE par **ANKS Labs**, sans reprendre ni code ni inte
 ## Ce que fait MS1
 
 ### Sources
-- **2 oscillateurs à table d'onde** (A et B), avec tables d'usine et **tables utilisateur** (fichiers WAV).
+- **2 oscillateurs à table d'onde** (A et B) : 8 tables d'usine + 2 emplacements **USER** (import WAV ou resample), 10 modes de warp.
 - **Sub**, **bruit**, et **corde** (Karplus-Strong).
 - **FM** et **modulation en anneau** entre A et B.
-- **Unison**, **drive** avant filtre.
+- **Unison** de 1 à 7 voix, **drive** avant filtre.
 - **Resample** : MS1 s'enregistre lui-même et réinjecte le résultat comme table d'onde.
 
 ### Filtres
-- **Filtre 1** et **filtre 2**, en série ou en parallèle.
-- Le filtre 2 a un mode **formants** (voyelles).
-- **Distorsion par voix** après les filtres.
+- **Filtre 1** : LP12, LP24, HP, BP, notch, peigne.
+- **Filtre 2** : LP, HP, BP, notch, **formants** (voyelles). Les deux filtres se montent en série ou en parallèle.
+- **Distorsion par voix** après les filtres (5 types).
 
 ### Modulation
 - **Enveloppe d'amplitude** et **enveloppe de modulation**.
 - **4 LFO** (formes, vitesse libre ou synchro).
 - **LFO dessiné** : tu traces la forme à la souris (32 points), avec formes prédéfinies et synchro.
 - **4 macros**.
-- **Matrice de modulation à 12 slots** : 17 sources vers 23 cibles.
+- **Matrice de modulation à 12 routes** : 16 sources (LFO, LFO dessiné, enveloppes, macros, vélocité, note, molette, aléa…) vers 22 cibles.
 
 ### Effets
 - Chaîne globale : **chorus / flanger → phaser → delay → reverb → EQ 8 bandes**.
@@ -62,7 +62,7 @@ Il est écrit en C++ avec JUCE par **ANKS Labs**, sans reprendre ni code ni inte
 - Fin de chaîne : compresseur, largeur stéréo, master, limiteur.
 
 ### Jeu
-- **Séquenceur pas à pas** (jusqu'à 64 pas, 4 mesures).
+- **Séquenceur pas à pas** (16 pas par mesure, jusqu'à 4 mesures).
 - **213 presets d'usine**, niveaux calibrés.
 - **MIDI learn** sur n'importe quel potard.
 
