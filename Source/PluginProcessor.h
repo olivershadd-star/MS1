@@ -448,6 +448,7 @@ public:
     static juce::String getFactoryPresetName (int index);
     static juce::String getFactoryPresetCategory (int index);
     void loadFactoryPreset (int index);
+    void mutateSound (float amount);          // varie le son courant de façon musicale (amount : 0,15 douce, 0,5 forte)
 
     // Listes de la matrice de modulation
     static juce::StringArray warpModeNames();

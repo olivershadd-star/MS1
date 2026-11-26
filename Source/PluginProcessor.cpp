@@ -1401,7 +1401,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
 
     // Unison
     addInt   ("unison", "Unison", 1, 7, 3);
-    addFloat ("detune", "Desaccord (cents)", NormalisableRange<float> (0.0f, 100.0f), 15.0f);
+    addFloat ("detune", "Desaccord (cents)", NormalisableRange<float> (0.0f, 100.0f, 0.0f, 0.5f), 15.0f);     // plus de course dans les petits écarts
     addFloat ("spread", "Stereo", unit, 0.6f);
 
     // Filtre
@@ -1541,7 +1541,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addBool  ("mono",      "Mono", false);
     addFloat ("glide",     "Glide (s)", NormalisableRange<float> (0.0f, 2.0f, 0.0f, 0.4f), 0.08f);
     addInt   ("bendRange", "Pitch Bend (demi-tons)", 1, 24, 2);
-    addFloat ("master",    "Volume", NormalisableRange<float> (0.0f, 1.5f), 1.0f);
+    addFloat ("master",    "Volume", NormalisableRange<float> (0.0f, 1.5f, 0.0f, 0.4f), 1.0f);     // courbe douce : chaque partie de la course change le niveau
     addChoice ("quality",   "Qualite", StringArray { "QUALITE ECO", "QUALITE NORMAL", "QUALITE HAUTE" }, 1);
 
     // Effets
@@ -2603,6 +2603,38 @@ juce::String MonSyntheProcessor::getFactoryPresetCategory (int index)
     const auto& presets = factoryPresets();
     return juce::isPositiveAndBelow (index, (int) presets.size()) ? juce::String (presets[(size_t) index].category)
                                                                    : juce::String();
+}
+
+void MonSyntheProcessor::mutateSound (float amount)
+{
+    // Réglages continus qu'on fait bouger, avec leur plafond (en proportion de la course) pour rester musical
+    struct M { const char* id; float lo, hi; };
+    static const M list[] = {
+        { "position", 0.0f, 1.0f }, { "oscBPos", 0.0f, 1.0f }, { "warpAmtA", 0.0f, 0.8f }, { "warpAmtB", 0.0f, 0.8f },
+        { "detune", 0.0f, 0.8f }, { "cutoff", 0.25f, 1.0f }, { "resonance", 0.0f, 0.65f }, { "drive", 0.0f, 0.6f },
+        { "fmAmount", 0.0f, 0.6f }, { "ringAmount", 0.0f, 0.6f }, { "subLevel", 0.0f, 0.8f }, { "noiseLevel", 0.0f, 0.5f },
+        { "f2Cutoff", 0.15f, 1.0f }, { "f2Res", 0.0f, 0.65f }, { "f2Vowel", 0.0f, 1.0f }, { "lfoDepth", 0.0f, 0.8f },
+        { "modAmount", 0.0f, 0.8f }, { "fltEnvAmount", 0.0f, 1.0f }, { "oscBLevel", 0.0f, 0.9f }, { "distAmt", 0.0f, 0.6f } };
+
+    juce::Random rnd;
+    auto gauss = [&rnd] { float s = 0.0f; for (int i = 0; i < 6; ++i) s += rnd.nextFloat(); return (s - 3.0f) * 0.8165f; };     // ~ N(0,1)
+
+    for (const auto& m : list)
+    {
+        if (rnd.nextFloat() > 0.35f + amount)           // pas tous les réglages à chaque fois
+            continue;
+        if (auto* rp = apvts.getParameter (m.id))
+        {
+            const float v = juce::jlimit (m.lo, m.hi, rp->getValue() + gauss() * amount);
+            rp->setValueNotifyingHost (v);
+        }
+    }
+
+    // De temps en temps, on change aussi de table d'onde
+    for (const char* id : { "tableA", "tableB" })
+        if (rnd.nextFloat() < amount * 0.8f)
+            if (auto* rp = apvts.getParameter (id))
+                rp->setValueNotifyingHost (rp->convertTo0to1 ((float) rnd.nextInt (WavetableBank::numTables)));
 }
 
 void MonSyntheProcessor::loadFactoryPreset (int index)

@@ -459,19 +459,19 @@ const MonSyntheEditor::MenuDef& MonSyntheEditor::menuAt (int index)
         { "PITCH",     0, VizPitch, VizScopeA,    { { "pitchEnvAmt", "QUANTITE" }, { "pitchEnvDecay", "DECAY" },
                                                     { "oscPhase", "PHASE" } } },
         { "FILTRE",    4, VizFilter, VizEnvFilter,{ { "cutoff", "CUTOFF" }, { "resonance", "RESO" },
-                                                    { "drive", "DRIVE" }, { "fltEnvAmount", "ENV AMT" },
-                                                    { "fltAttack", "ATTACK" }, { "fltDecay", "DECAY" },
-                                                    { "fltSustain", "SUSTAIN" }, { "fltRelease", "RELEASE" } } },
+                                                    { "drive", "DRIVE" }, { "fltEnvAmount", "ENV > CUTOFF" },
+                                                    { "fltAttack", "ATTACK FLT" }, { "fltDecay", "DECAY FLT" },
+                                                    { "fltSustain", "SUSTAIN FLT" }, { "fltRelease", "RELEASE FLT" } } },
         { "FILTRE 2",  1, VizFilter2, VizSpectrum,{ { "f2Cutoff", "CUTOFF" }, { "f2Res", "RESO" },
                                                     { "f2Mix", "MIX" }, { "f2Vowel", "VOYELLE" } } },
         { "DISTO",     4, VizDisto, VizSpectrum,  { { "distAmt", "QUANTITE" }, { "distMix", "MIX" },
                                                     { "drive", "DRIVE PRE" } } },
-        { "ENV AMP",   5, VizEnvAmp, VizSpectrum, { { "attack", "ATTACK" }, { "decay", "DECAY" },
-                                                    { "sustain", "SUSTAIN" }, { "release", "RELEASE" },
+        { "ENV VOLUME",5, VizEnvAmp, VizSpectrum, { { "attack", "ATTACK VOL" }, { "decay", "DECAY VOL" },
+                                                    { "sustain", "SUSTAIN VOL" }, { "release", "RELEASE VOL" },
                                                     { "velAmp", "VEL > VOL" }, { "velFilter", "VEL > FILTRE" },
                                                     { "voiceGain", "GAIN" } } },
-        { "ENV MOD",   0, VizEnvMod, VizSpectrum, { { "modAttack", "ATTACK" }, { "modDecay", "DECAY" },
-                                                    { "modSustain", "SUSTAIN" }, { "modRelease", "RELEASE" },
+        { "ENV MOD",   0, VizEnvMod, VizSpectrum, { { "modAttack", "ATTACK MOD" }, { "modDecay", "DECAY MOD" },
+                                                    { "modSustain", "SUSTAIN MOD" }, { "modRelease", "RELEASE MOD" },
                                                     { "modAmount", "QUANTITE" } } },
         { "LFO",       1, VizLfo1, VizLfo2,       { { "lfoRate", "VITESSE" }, { "lfoDepth", "INTENSITE" },
                                                     { nullptr, nullptr }, { nullptr, nullptr },
@@ -541,6 +541,7 @@ MonSyntheEditor::Knob* MonSyntheEditor::makeKnob (const juce::String& paramId, c
 
     s.addMouseListener (this, false);
     auto* raw = k.get();
+    s.onDragStart = [this, raw] { autoEnable (raw->paramId); };
     knobs.push_back (std::move (k));
     return raw;
 }
@@ -570,6 +571,13 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
         macroKnobs[(size_t) i] = makeKnob ("macro" + juce::String (i + 1), "MACRO " + juce::String (i + 1), 4);
 
     masterKnob = makeKnob ("master", "VOLUME", 0);
+    masterKnob->slider.textFromValueFunction = [] (double v) { return v <= 0.0005 ? juce::String ("-inf dB") : juce::String (20.0 * std::log10 (v), 1) + " dB"; };
+    masterKnob->slider.valueFromTextFunction = [] (const juce::String& t)
+    {
+        const double x = t.getDoubleValue();
+        return t.containsIgnoreCase ("db") ? std::pow (10.0, x / 20.0) : x;
+    };
+    masterKnob->slider.updateText();
     gateKnob   = makeKnob ("seqGate", "GATE", 5, true);
     tempoKnob  = makeKnob ("seqTempo", "TEMPO", 5, true);
 
@@ -740,8 +748,16 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     addAndMakeVisible (recButton);
 
     // --- En-tête : presets
-    for (auto* b : { &prevButton, &nextButton, &saveButton, &deleteButton })
+    for (auto* b : { &prevButton, &nextButton, &saveButton, &deleteButton, &mutateButton })
         styleButton (*b, 0);
+    addAndMakeVisible (mutateButton);
+    mutateButton.onClick = [this]
+    {
+        const bool strong = juce::ModifierKeys::currentModifiers.isShiftDown();
+        proc.mutateSound (strong ? 0.5f : 0.15f);
+        statusMessage = strong ? "MUTATION FORTE" : "MUTATION DOUCE (Maj + clic = forte)";
+        statusFrames = 90;
+    };
 
     presetBox.setColour (juce::ComboBox::arrowColourId, Pal::cyan);
     presetBox.setColour (juce::ComboBox::textColourId, Pal::text);
@@ -1156,12 +1172,13 @@ void MonSyntheEditor::resized()
 
     // En-tête
     prevButton.setBounds (R (176, 12, 26, 28));
-    presetBox.setBounds (R (206, 12, 214, 28));
-    nextButton.setBounds (R (424, 12, 26, 28));
-    nameEditor.setBounds (R (458, 12, 120, 28));
-    saveButton.setBounds (R (582, 12, 52, 28));
-    deleteButton.setBounds (R (638, 12, 62, 28));
-    browserButton.setBounds (R (706, 12, 78, 28));
+    presetBox.setBounds (R (206, 12, 180, 28));
+    nextButton.setBounds (R (390, 12, 26, 28));
+    nameEditor.setBounds (R (424, 12, 110, 28));
+    saveButton.setBounds (R (538, 12, 48, 28));
+    deleteButton.setBounds (R (590, 12, 56, 28));
+    browserButton.setBounds (R (650, 12, 74, 28));
+    mutateButton.setBounds (R (728, 12, 56, 28));
     headerSpectrum.setBounds (R (792, 8, 210, 38));
     if (browser != nullptr)
         browser->setBounds (R (184, 60, 828, 476));
@@ -3412,8 +3429,30 @@ void MonSyntheEditor::mouseExit (const juce::MouseEvent& e)
         hoveredKnob = nullptr;
 }
 
+void MonSyntheEditor::autoEnable (const juce::String& id)
+{
+    // Un potard qui ne fait rien parce que son module est sur OFF déroute : on l'allume au premier geste.
+    auto enable = [this] (const char* choiceId, int value, const char* msg)
+    {
+        if (proc.apvts.getRawParameterValue (choiceId)->load() < 0.5f)
+            if (auto* p = proc.apvts.getParameter (choiceId))
+            {
+                p->setValueNotifyingHost (p->convertTo0to1 ((float) value));
+                statusMessage = msg;
+                statusFrames = 90;
+            }
+    };
+
+    if (id == "warpAmtA")        enable ("warpModeA", 1, "WARP A ACTIVE (BEND+) : change le mode dans la liste");
+    else if (id == "warpAmtB")   enable ("warpModeB", 1, "WARP B ACTIVE (BEND+) : change le mode dans la liste");
+    else if (id == "f2Vowel")    enable ("f2Type", 5, "FILTRE 2 ACTIVE (FORMANTS)");
+    else if (id == "f2Cutoff" || id == "f2Res" || id == "f2Mix")
+        enable ("f2Type", 1, "FILTRE 2 ACTIVE (LP 12) : change le type dans la liste");
+}
+
 void MonSyntheEditor::nudgeKnob (Knob& k, int direction, bool fine, bool big)
 {
+    autoEnable (k.paramId);
     auto& s = k.slider;
     const double lo = s.getMinimum(), hi = s.getMaximum();
     const double range = hi - lo;

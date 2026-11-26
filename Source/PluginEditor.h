@@ -324,6 +324,8 @@ private:
         juce::String paramId;      // paramètre actuellement relié (pour la modulation par clic droit)
     };
     void showModMenu (Knob& knob);
+    void autoEnable (const juce::String& paramId);      // active le module quand on touche un de ses potards
+    juce::TextButton mutateButton { "MUTER" };
 
     enum Viz { VizNone = 0, VizScopeA, VizUnison, VizScopeB, VizFmRing, VizFilter,
                VizEnvFilter, VizEnvAmp, VizEnvMod, VizLfo1, VizLfo2, VizLfo3, VizLfo4, VizGlide,
