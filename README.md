@@ -10,8 +10,6 @@
 
 **ANKS Labs**
 
-[![Builds](https://img.shields.io/badge/GITHUB_ACTIONS-TELECHARGER_LE_BUILD-19B9FF?style=for-the-badge&labelColor=10151E)](https://github.com/olivershadd-star/MS1/actions)
-
 <img src="docs/MS1_interface.png" alt="Interface et caractéristiques de MS1" width="800">
 
 </div>
