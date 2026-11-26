@@ -317,6 +317,7 @@ int main()
         juce::AudioBuffer<float> buf (2, BLOCK);
         std::vector<float> x;
         const int scale[] = { 0, 3, 5, 7, 10, 12, 15, 17 };
+        std::vector<std::pair<int, int>> offs;      // (bloc, note)
         for (int b = 0; b < total; ++b)
         {
             juce::MidiBuffer midi;
@@ -327,9 +328,12 @@ int main()
                 const int n = 48 + scale[step % 8] + (step / 8) % 2 * 12;
                 midi.addEvent (juce::MidiMessage::noteOn (1, n, 0.8f), 0);
                 midi.addEvent (juce::MidiMessage::noteOn (1, n + 7, 0.8f), 0);
-                midi.addEvent (juce::MidiMessage::noteOff (1, n), 150);
-                midi.addEvent (juce::MidiMessage::noteOff (1, n + 7), 150);
+                offs.emplace_back (b + 26, n);          // tenue d'environ 0,3 s
+                offs.emplace_back (b + 26, n + 7);
             }
+            for (auto& o : offs)
+                if (o.first == b)
+                    midi.addEvent (juce::MidiMessage::noteOff (1, o.second), 0);
             buf.clear();
             proc.processBlock (buf, midi);
             for (int i = 0; i < BLOCK; ++i) x.push_back (0.5f * (buf.getSample (0, i) + buf.getSample (1, i)));
