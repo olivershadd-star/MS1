@@ -122,8 +122,8 @@ int main()
     juce::ScopedJuceInitialiser_GUI init;
     const auto tBuild = std::chrono::high_resolution_clock::now();
     MonSyntheProcessor proc;
-    std::printf ("Temps de creation du synthe (tables comprises) : %.0f ms\\n", std::chrono::duration<double, std::milli> (std::chrono::high_resolution_clock::now() - tBuild).count());
-    { const auto t1 = std::chrono::high_resolution_clock::now(); MonSyntheProcessor p2; std::printf ("Deuxieme instance : %.0f ms\\n", std::chrono::duration<double, std::milli> (std::chrono::high_resolution_clock::now() - t1).count()); }
+    std::printf ("Temps de creation du synthe (tables comprises) : %.0f ms\n", std::chrono::duration<double, std::milli> (std::chrono::high_resolution_clock::now() - tBuild).count());
+    { const auto t1 = std::chrono::high_resolution_clock::now(); MonSyntheProcessor p2; std::printf ("Deuxieme instance : %.0f ms\n", std::chrono::duration<double, std::milli> (std::chrono::high_resolution_clock::now() - t1).count()); }
     proc.setRateAndBufferSizeDetails (SR, BLOCK);
     proc.prepareToPlay (SR, BLOCK);
     const int nPresets = MonSyntheProcessor::getNumFactoryPresets();
