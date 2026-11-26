@@ -46,6 +46,7 @@ Il est écrit en C++ avec JUCE par **ANKS Labs**, sans reprendre ni code ni inte
 - **Sub**, **bruit**, et **corde** (Karplus-Strong).
 - **FM** et **modulation en anneau** entre A et B.
 - **Unison** de 1 à 7 voix, **drive** avant filtre.
+- **Réglage Qualité** (page MASTER) : *Éco* (le plus léger), *Normal* (suréchantillonnage 2x, son plus propre en FM, warp et distorsion), *Haute* (4x sur les oscillateurs).
 - **Resample** : MS1 s'enregistre lui-même et réinjecte le résultat comme table d'onde.
 
 ### Filtres
