@@ -313,8 +313,14 @@ private:
         {
             const float* a = hl.data() + pos + 1;
             const float* b = hr.data() + pos + 1;
-            float sl = 0.0f, sr = 0.0f;
-            for (int k = 0; k < taps; ++k) { sl += h[(size_t) k] * a[k]; sr += h[(size_t) k] * b[k]; }
+            const int M = (taps - 1) / 2;
+            float sl = h[(size_t) M] * a[M], sr = h[(size_t) M] * b[M];
+            for (int k = 0; k < M; ++k)             // le filtre est symétrique : deux échantillons par multiplication
+            {
+                const float cf = h[(size_t) k];
+                sl += cf * (a[k] + a[taps - 1 - k]);
+                sr += cf * (b[k] + b[taps - 1 - k]);
+            }
             l = sl; r = sr;
         }
     };
@@ -355,6 +361,8 @@ private:
     };
 
     Decim oscDec;
+    std::array<float, 16> oDlyL {}, oDlyR {};   // retard du signal des oscillateurs quand le suréchantillonnage est inutile
+    int oDlyPos = 0;
     Os2 driveOs, distOs;
 };
 

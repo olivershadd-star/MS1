@@ -909,7 +909,10 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         }
         };
 
-        if (osF > 1)
+        // Le suréchantillonnage ne sert que si FM, ring ou warp créent des harmoniques au-delà de la limite ;
+        // sinon les tables (déjà limitées en bande) passent directement, avec le même retard de 16 échantillons.
+        const bool needOs = fm > 0.001f || ring > 0.001f || (warpModeA != 0 && warpA > 0.001f) || (warpModeB != 0 && warpB > 0.001f);
+        if (osF > 1 && needOs)
         {
             for (int j = 0; j < osF; ++j)
             {
@@ -918,6 +921,16 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
                 oscDec.push (a, b);
             }
             oscDec.out (l, r);
+        }
+        else if (osF > 1)
+        {
+            float a, b;
+            oscStage (1.0, a, b);
+            for (int j = 0; j < osF; ++j)
+                oscDec.push (a, b);              // garde l'historique du filtre à jour pour une bascule sans à-coup
+            l = oDlyL[(size_t) oDlyPos];  r = oDlyR[(size_t) oDlyPos];
+            oDlyL[(size_t) oDlyPos] = a;  oDlyR[(size_t) oDlyPos] = b;
+            oDlyPos = (oDlyPos + 1) & 15;
         }
         else
             oscStage (1.0, l, r);
