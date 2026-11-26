@@ -306,6 +306,47 @@ int main()
     auto ch2 = render (proc, { 48, 52, 55, 59, 60, 64, 67, 71 }, 2.0, 0.5);
     std::printf ("Init, 8 notes, unison 7 + osc B : %.1f%% d'un coeur\n", ch2.cpu * 100.0);
 
+    // ------------------------------------------------------------------ H. Accords enchaines (voix volees, queues longues)
+    std::printf ("\n== H. ACCORDS ENCHAINES : 40 notes rapides sur nappe a longue queue (coupures et clics)\n");
+    for (int pi : { 0, 67, 64, 77 })
+    {
+        proc.loadFactoryPreset (pi);
+        setP (proc, "release", 4.0f);
+        proc.reset();
+        const int total = (int) (16.0 * SR / BLOCK);
+        juce::AudioBuffer<float> buf (2, BLOCK);
+        std::vector<float> x;
+        const int scale[] = { 0, 3, 5, 7, 10, 12, 15, 17 };
+        for (int b = 0; b < total; ++b)
+        {
+            juce::MidiBuffer midi;
+            const double t = (double) b * BLOCK / SR;
+            const int step = (int) (t / 0.35), prevStep = (int) (((double) b * BLOCK - BLOCK) / SR / 0.35);
+            if (b == 0 || step != prevStep)
+            {
+                const int n = 48 + scale[step % 8] + (step / 8) % 2 * 12;
+                midi.addEvent (juce::MidiMessage::noteOn (1, n, 0.8f), 0);
+                midi.addEvent (juce::MidiMessage::noteOn (1, n + 7, 0.8f), 0);
+                midi.addEvent (juce::MidiMessage::noteOff (1, n), 150);
+                midi.addEvent (juce::MidiMessage::noteOff (1, n + 7), 150);
+            }
+            buf.clear();
+            proc.processBlock (buf, midi);
+            for (int i = 0; i < BLOCK; ++i) x.push_back (0.5f * (buf.getSample (0, i) + buf.getSample (1, i)));
+        }
+        // clics : sauts de la derivee seconde, par rapport au niveau local
+        int spikes = 0; float worst = 0.0f;
+        for (size_t i = 4096; i + 2 < x.size(); i += 1)
+        {
+            if (i % 2048 == 0 || i == 4096) {}
+            const double d2 = (double) x[i + 2] - 2.0 * x[i + 1] + x[i];
+            double e = 0; for (size_t k = i - 2048; k < i; k += 16) { const double dd = (double) x[k + 2] - 2.0 * x[k + 1] + x[k]; e += dd * dd; }
+            const double sd = std::sqrt (e / 128.0);
+            if (sd > 1.0e-6 && std::abs (d2) > 12.0 * sd) { ++spikes; worst = juce::jmax (worst, (float) (std::abs (d2) / sd)); }
+        }
+        std::printf ("%s : %d clics detectes, pire %.0f sigma, niveau max %.1f dB\n", MonSyntheProcessor::getFactoryPresetName (pi).toRawUTF8(), spikes, worst, db (rmsRange (x, 2.0, 15.0)));
+    }
+
     std::printf ("\nFIN\n");
     return 0;
 }
