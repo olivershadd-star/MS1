@@ -42,7 +42,7 @@ Il est écrit en C++ avec JUCE par **ANKS Labs**, sans reprendre ni code ni inte
 ## Ce que fait MS1
 
 ### Sources
-- **2 oscillateurs à table d'onde** (A et B) : 8 tables d'usine + 2 emplacements **USER** (import WAV ou resample), 10 modes de warp.
+- **2 oscillateurs à table d'onde** (A et B) : **24 tables d'usine** (8 classiques calculées + 16 tables riches de jusqu'à 64 formes d'onde : choeur, FM, orgue, piano, cordes, vents, granulaire, disto, chip, basses, guitares…) + 2 emplacements **USER** (import WAV ou resample), 10 modes de warp.
 - **Sub**, **bruit**, et **corde** (Karplus-Strong).
 - **FM** et **modulation en anneau** entre A et B.
 - **Unison** de 1 à 7 voix, **drive** avant filtre.
@@ -110,6 +110,8 @@ Dans certains hôtes, le clavier de l'ordinateur ne parvient pas toujours à la 
 - Les presets d'usine sont générés dans `Source/FactoryBank.cpp`.
 
 ## Droits et licence
+
+Les 16 tables riches sont dérivées d'**AKWF (Adventure Kid Waveforms)** de Kristoffer Ekstrand, mises à disposition en **CC0** (domaine public) : https://github.com/KristofferKarlAxelEkstrand/AKWF-FREE
 
 Projet **ANKS Labs**, distribué librement et gratuitement. Rendre un dépôt public n'accorde pas à lui seul de licence de réutilisation : vérifie la licence du dépôt et les conditions de **JUCE** avant toute redistribution. *Massive*, *Serum* et les noms associés appartiennent à leurs propriétaires ; MS1 n'a aucun lien avec ces produits.
 
