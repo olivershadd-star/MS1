@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "WavetableData.h"
 #include "FactoryBank.h"
 #include "PluginEditor.h"
 
@@ -26,7 +27,10 @@ static float basicAmp (int frame, int h)
 
 juce::StringArray WavetableBank::tableNames()
 {
-    return { "BASIQUE", "VOCAL", "PWM", "SPECTRE", "ORGUE", "RESONANCE", "PEIGNE", "CHAOS", "USER 1", "USER 2" };
+    return { "BASIQUE", "VOCAL", "PWM", "SPECTRE", "ORGUE", "RESONANCE", "PEIGNE", "CHAOS",
+             "CLASSIQUE", "CHOEUR", "FM METAL", "ORGUE ELEC", "PIANO EP", "CORDES", "VENTS", "GRANULAIRE",
+             "DISTO", "HARMONIQUES", "CHIP", "BASSES", "GUITARES", "DESSIN", "SYNTH A", "SYNTH B",
+             "USER 1", "USER 2" };
 }
 
 float WavetableBank::harmonicAmp (int tableIndex, int frame, int h)
@@ -107,9 +111,125 @@ float WavetableBank::harmonicAmp (int tableIndex, int frame, int h)
     }
 }
 
+//==============================================================================
+// Wavetables riches dérivées d'AKWF : décodage des harmoniques stockées, puis une version limitée en bande par octave
+// (même principe que les tables classiques), par FFT inverse. Construites une seule fois pour tout le processus.
+struct AkwfData
+{
+    std::vector<float> data;
+    std::array<int, WavetableBank::numAkwf> frames {};
+    std::array<size_t, WavetableBank::numAkwf> offset {};
+};
+
+static std::shared_ptr<const AkwfData> buildAkwfData()
+{
+    auto out = std::make_shared<AkwfData>();
+    constexpr int N = WavetableBank::tableSize;
+    constexpr int NH = 299;                       // harmoniques stockées par forme d'onde
+    constexpr int numLevels = WavetableBank::numLevels;
+
+    // 1) décodage : base64 -> gzip -> octets
+    juce::MemoryOutputStream decoded;
+    for (int i = 0; i < WavetableData::numChunks(); ++i)
+        juce::Base64::convertFromBase64 (decoded, juce::String (WavetableData::chunks()[i]));
+
+    juce::MemoryInputStream mi (decoded.getData(), decoded.getDataSize(), false);
+    juce::GZIPDecompressorInputStream gz (&mi, false, juce::GZIPDecompressorInputStream::gzipFormat);
+    juce::MemoryBlock raw;
+    gz.readIntoMemoryBlock (raw);
+
+    const auto* bytes = static_cast<const juce::uint8*> (raw.getData());
+    size_t pos = 0;
+    auto have = [&] (size_t n) { return pos + n <= raw.getSize(); };
+    if (! have (1))
+        return out;
+
+    const int nTables = bytes[pos++];
+
+    // 2) étalonnage de la FFT inverse (échelle et signe), pour ne dépendre d'aucune convention
+    juce::dsp::FFT fft (11);
+    std::vector<float> spec ((size_t) (2 * N), 0.0f);
+    auto coeff = [&] (float re, float im, bool wantSin)
+    {
+        std::fill (spec.begin(), spec.end(), 0.0f);
+        spec[2] = re;  spec[3] = im;                       // harmonique 1
+        fft.performRealOnlyInverseTransform (spec.data());
+        double s = 0.0;
+        for (int i = 0; i < N; ++i)
+        {
+            const double th = juce::MathConstants<double>::twoPi * (double) i / (double) N;
+            s += (double) spec[(size_t) i] * (wantSin ? std::sin (th) : std::cos (th));
+        }
+        return (float) (s / (N * 0.5));
+    };
+    const float cc = coeff (1.0f, 0.0f, false);            // coefficient en cosinus produit par Re = 1
+    const float cs = coeff (0.0f, 1.0f, true);             // coefficient en sinus produit par Im = 1
+    if (std::abs (cc) < 1.0e-9f || std::abs (cs) < 1.0e-9f)
+        return out;
+    const float gRe = 1.0f / cc, gIm = 1.0f / cs;
+
+    // 3) construction
+    std::vector<std::vector<juce::int16>> coefs;           // par table : frames * NH * 2
+    for (int t = 0; t < nTables && t < WavetableBank::numAkwf; ++t)
+    {
+        if (! have (1)) break;
+        const int nf = bytes[pos++];
+        const size_t count = (size_t) nf * NH * 2;
+        if (! have (count * 2)) break;
+        std::vector<juce::int16> v (count);
+        for (size_t i = 0; i < count; ++i)
+            v[i] = (juce::int16) (bytes[pos + 2 * i] | (bytes[pos + 2 * i + 1] << 8));
+        pos += count * 2;
+        out->frames[(size_t) t] = nf;
+        out->offset[(size_t) t] = out->data.size();
+        out->data.resize (out->data.size() + (size_t) nf * numLevels * N, 0.0f);
+        coefs.push_back (std::move (v));
+    }
+
+    constexpr float q = 1.0f / 15000.0f;
+    for (size_t t = 0; t < coefs.size(); ++t)
+    {
+        const int nf = out->frames[t];
+        for (int f = 0; f < nf; ++f)
+        {
+            const juce::int16* c = coefs[t].data() + (size_t) f * NH * 2;
+            float scale = 1.0f;
+            for (int level = 0; level < numLevels; ++level)
+            {
+                std::fill (spec.begin(), spec.end(), 0.0f);
+                const int maxH = juce::jmin (NH, 512 >> level);
+                for (int k = 1; k <= maxH; ++k)
+                {
+                    spec[(size_t) (2 * k)]     = (float) c[2 * (k - 1)] * q * gRe;
+                    spec[(size_t) (2 * k + 1)] = (float) c[2 * (k - 1) + 1] * q * gIm;
+                }
+                fft.performRealOnlyInverseTransform (spec.data());
+
+                float* dst = out->data.data() + out->offset[t] + (size_t) (f * numLevels + level) * N;
+                if (level == 0)
+                {
+                    float peak = 0.0f;
+                    for (int i = 0; i < N; ++i) peak = juce::jmax (peak, std::abs (spec[(size_t) i]));
+                    scale = peak > 1.0e-6f ? 1.0f / peak : 1.0f;     // même facteur pour toutes les versions d'une forme d'onde
+                }
+                for (int i = 0; i < N; ++i)
+                    dst[i] = spec[(size_t) i] * scale;
+            }
+        }
+    }
+    return out;
+}
+
+static std::shared_ptr<const AkwfData> getAkwfData()
+{
+    static const std::shared_ptr<const AkwfData> shared = buildAkwfData();
+    return shared;
+}
+
 WavetableBank::WavetableBank()
 {
-    data.assign ((size_t) numTables * numFrames * numLevels * tableSize, 0.0f);
+    ak = getAkwfData();
+    data.assign ((size_t) numClassic * numFrames * numLevels * tableSize, 0.0f);
 
     std::vector<float> sine (tableSize);
     for (int i = 0; i < tableSize; ++i)
@@ -117,7 +237,7 @@ WavetableBank::WavetableBank()
 
     std::vector<float> acc ((size_t) tableSize);
 
-    for (int t = 0; t < numTables; ++t)
+    for (int t = 0; t < numClassic; ++t)
     {
         for (int frame = 0; frame < numFrames; ++frame)
         {
@@ -172,9 +292,18 @@ float WavetableBank::getSample (int tableIndex, float pos, int level, double pha
     const float* base = nullptr;
     int frames = numFrames;
 
-    if (idx < numTables)
+    if (idx < numClassic)
     {
         base = data.data() + (size_t) idx * numFrames * numLevels * tableSize;
+    }
+    else if (idx < numTables)
+    {
+        const int t = idx - numClassic;
+        frames = ak->frames[(size_t) t];
+        if (frames <= 0)
+            return 0.0f;
+
+        base = ak->data.data() + ak->offset[(size_t) t];
     }
     else
     {

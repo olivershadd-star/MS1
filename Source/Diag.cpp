@@ -120,7 +120,10 @@ double hz (int note) { return 440.0 * std::pow (2.0, (note - 69) / 12.0); }
 int main()
 {
     juce::ScopedJuceInitialiser_GUI init;
+    const auto tBuild = std::chrono::high_resolution_clock::now();
     MonSyntheProcessor proc;
+    std::printf ("Temps de creation du synthe (tables comprises) : %.0f ms\\n", std::chrono::duration<double, std::milli> (std::chrono::high_resolution_clock::now() - tBuild).count());
+    { const auto t1 = std::chrono::high_resolution_clock::now(); MonSyntheProcessor p2; std::printf ("Deuxieme instance : %.0f ms\\n", std::chrono::duration<double, std::milli> (std::chrono::high_resolution_clock::now() - t1).count()); }
     proc.setRateAndBufferSizeDetails (SR, BLOCK);
     proc.prepareToPlay (SR, BLOCK);
     const int nPresets = MonSyntheProcessor::getNumFactoryPresets();
@@ -195,6 +198,24 @@ int main()
         setP (proc, "quality", (float) q); setP (proc, "unison", 7.0f); setP (proc, "oscBLevel", 0.6f); setP (proc, "fmAmount", 0.3f);
         auto rc = render (proc, { 48, 52, 55, 59, 60, 64, 67, 71 }, 2.0, 0.5);
         std::printf ("qualite %d  CPU 8 notes, unison 7, osc B + FM : %.1f%%\n", q, rc.cpu * 100.0);
+    }
+
+    std::printf ("\n== C3. TABLES : niveau (dB) et variation du spectre en balayant la position 0 -> 1 (note C4, une voix)\n");
+    for (int t = 0; t < WavetableBank::numTables; ++t)
+    {
+        std::vector<std::vector<float>> sp; float lo = 99, hi = -99;
+        for (float pos : { 0.0f, 0.2f, 0.4f, 0.6f, 0.8f, 1.0f })
+        {
+            proc.loadFactoryPreset (0);
+            setP (proc, "tableA", (float) t); setP (proc, "position", pos); setP (proc, "cutoff", 20000.0f); setP (proc, "unison", 1.0f);
+            auto r = render (proc, { 60 }, 0.9, 0.1);
+            sp.push_back (bands (r.m, 0.3, 0.8));
+            const float lv = db (rmsRange (r.m, 0.3, 0.8)); lo = juce::jmin (lo, lv); hi = juce::jmax (hi, lv);
+        }
+        float step = 0, tot = bandDist (sp.front(), sp.back(), true);
+        for (size_t i = 0; i + 1 < sp.size(); ++i) step += bandDist (sp[i], sp[i + 1], true);
+        std::printf ("table %2d %-12s : niveau %.1f..%.1f dB, variation totale %.1f dB, par pas %.1f dB\n", t,
+                     WavetableBank::tableNames()[t].toRawUTF8(), lo, hi, tot, step / 5.0f);
     }
 
     // ------------------------------------------------------------------ D. Sensibilite des potards

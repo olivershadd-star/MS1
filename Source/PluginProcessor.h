@@ -114,8 +114,10 @@ class WavetableBank
 {
 public:
     static constexpr int tableSize = 2048;
-    static constexpr int numTables = 8;         // 8 wavetables intégrées ...
-    static constexpr int numFrames = 8;         // ... de 8 formes d'onde chacune
+    static constexpr int numClassic = 8;        // 8 wavetables « classiques » calculées (8 formes d'onde chacune) ...
+    static constexpr int numFrames = 8;
+    static constexpr int numAkwf = 16;          // ... + 16 wavetables riches (jusqu'à 64 formes d'onde), dérivées d'AKWF (CC0)
+    static constexpr int numTables = numClassic + numAkwf;
     static constexpr int numLevels = 10;
     static constexpr int numUserTables = 2;     // + 2 emplacements pour tes propres fichiers .wav
     static constexpr int totalTables = numTables + numUserTables;
@@ -142,6 +144,7 @@ private:
     static float harmonicAmp (int tableIndex, int frame, int harmonic);
 
     std::vector<float> data;
+    std::shared_ptr<const struct AkwfData> ak;      // partagé entre toutes les instances du plugin (économie de mémoire)
 
     struct UserSlot
     {

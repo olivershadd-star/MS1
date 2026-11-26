@@ -29,7 +29,8 @@ target_sources(MS1 PRIVATE
     Source/FactoryBank.h
     Source/FactoryBank.cpp
     Source/FxRack.h
-    Source/FxRack.cpp)
+    Source/FxRack.cpp
+    Source/WavetableData.cpp)
 
 target_compile_definitions(MS1 PUBLIC
     JUCE_WEB_BROWSER=0
@@ -51,7 +52,8 @@ target_sources(PresetCheck PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/FactoryBank.cpp
-    Source/FxRack.cpp)
+    Source/FxRack.cpp
+    Source/WavetableData.cpp)
 set_target_properties(PresetCheck PROPERTIES EXCLUDE_FROM_ALL TRUE)
 target_compile_definitions(PresetCheck PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 target_link_libraries(PresetCheck PRIVATE juce::juce_audio_utils juce::juce_dsp juce::juce_recommended_config_flags)
@@ -63,7 +65,8 @@ target_sources(Snapshot PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/FactoryBank.cpp
-    Source/FxRack.cpp)
+    Source/FxRack.cpp
+    Source/WavetableData.cpp)
 set_target_properties(Snapshot PROPERTIES EXCLUDE_FROM_ALL TRUE)
 target_compile_definitions(Snapshot PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_MODAL_LOOPS_PERMITTED=1)
 target_link_libraries(Snapshot PRIVATE juce::juce_audio_utils juce::juce_dsp juce::juce_recommended_config_flags)
@@ -75,7 +78,8 @@ target_sources(Diag PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/FactoryBank.cpp
-    Source/FxRack.cpp)
+    Source/FxRack.cpp
+    Source/WavetableData.cpp)
 set_target_properties(Diag PROPERTIES EXCLUDE_FROM_ALL TRUE)
 target_compile_definitions(Diag PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 target_link_libraries(Diag PRIVATE juce::juce_audio_utils juce::juce_dsp juce::juce_recommended_config_flags)
