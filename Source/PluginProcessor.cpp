@@ -371,6 +371,9 @@ void SynthVoice::prepare (double sampleRate, int blockSize)
     modEnv.setSampleRate (sr);
     fltEnv.setSampleRate (sr);
     position.reset (sr, 0.02);   // lissage de 20 ms pour éviter les clics
+    oscDec.design (2);
+    driveOs.reset();
+    distOs.reset();
 
     juce::dsp::ProcessSpec spec { sr, (juce::uint32) blockSize, 2 };   // filtres stéréo
     filter.prepare (spec);
@@ -427,10 +430,18 @@ void SynthVoice::startNote (int midiNote, float vel, juce::SynthesiserSound*, in
     noteRandom = rng.nextFloat() * 2.0f - 1.0f;
     keyDown = true;
 
+    // Si la voix sonne encore (note volée ou queue longue), on la reprend sans coupure :
+    // phases, filtres et LFO continuent, seule la hauteur change. Cela supprime le « tac » au début des notes.
+    const bool cont = adsr.isActive();
+    fastRel = false;
+
     // Départ de phase : ALEATOIRE (son large), FIXE (toujours identique : kicks et basses précises), LIBRE (on ne touche à rien)
     const int phaseMode = (int) param ("phaseMode");
     const double phase0 = (double) param ("oscPhase");
-    if (phaseMode == 0)
+    if (cont && phaseMode != 1)             // reprise douce : on ne touche pas aux phases (sauf mode FIXE, pour les kicks)
+    {
+    }
+    else if (phaseMode == 0)
     {
         phasesA[0] = phase0;
         phasesB[0] = phase0;
@@ -448,7 +459,7 @@ void SynthVoice::startNote (int midiNote, float vel, juce::SynthesiserSound*, in
         phaseSub = phase0;
     }
 
-    if (phaseMode != 2)                      // décalage de phase de B par rapport à A (présence, phasing)
+    if (phaseMode != 2 && ! cont)            // décalage de phase de B par rapport à A (présence, phasing)
     {
         const double offB = (double) param ("oscBPhase");
         for (auto& p : phasesB)
@@ -460,14 +471,20 @@ void SynthVoice::startNote (int midiNote, float vel, juce::SynthesiserSound*, in
 
     pitchEnvVal = 1.0f;
     noiseEnvVal = 1.0f;
-    for (auto& n : noiseGen)
-        n = NoiseGen();
-    crushCount = 0;
-    lfoPhase = 0.0;
-    lfo2Phase = 0.0;
-    lfo3Phase = 0.0;
-    lfo4Phase = 0.0;
-    drawPhase = 0.0;
+    if (! cont)
+    {
+        for (auto& n : noiseGen)
+            n = NoiseGen();
+        crushCount = 0;
+        lfoPhase = 0.0;
+        lfo2Phase = 0.0;
+        lfo3Phase = 0.0;
+        lfo4Phase = 0.0;
+        drawPhase = 0.0;
+        oscDec.reset();
+        driveOs.reset();
+        distOs.reset();
+    }
     for (auto& b : combBuf)
         b.fill (0.0f);
     combPos = 0;
@@ -500,8 +517,11 @@ void SynthVoice::startNote (int midiNote, float vel, juce::SynthesiserSound*, in
     }
 
     position.setCurrentAndTargetValue (param ("position"));
-    filter.reset();
-    filter2.reset();
+    if (! cont)
+    {
+        filter.reset();
+        filter2.reset();
+    }
 
     adsr.noteOn();
     modEnv.noteOn();
@@ -526,10 +546,14 @@ void SynthVoice::stopNote (float, bool allowTailOff)
     }
     else
     {
-        adsr.reset();
-        modEnv.reset();
-        fltEnv.reset();
-        clearCurrentNote();
+        // Coupure (note volée ou arrêt d'urgence) : fondu de 5 ms au lieu d'un silence instantané.
+        // Si une nouvelle note démarre sur cette voix, elle reprend le signal sans coupure (voir startNote).
+        fastRel = true;
+        adsr.noteOff();
+        modEnv.noteOff();
+        fltEnv.noteOff();
+        if (! adsr.isActive())
+            clearCurrentNote();
     }
 }
 
@@ -544,11 +568,19 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         return;
 
     // --- Enveloppes (les durées de decay peuvent être modulées par la matrice, voir plus bas)
-    const float ampA = param ("attack"),    ampD = param ("decay"),    ampS = param ("sustain"),    ampR = param ("release");
+    const float ampA = param ("attack"),    ampD = param ("decay"),    ampS = param ("sustain"),    ampR = fastRel ? 0.005f : param ("release");
     const float fltA = param ("fltAttack"), fltD = param ("fltDecay"), fltS = param ("fltSustain"), fltR = param ("fltRelease");
     adsr.setParameters   ({ ampA, ampD, ampS, ampR });
     modEnv.setParameters ({ param ("modAttack"), param ("modDecay"), param ("modSustain"), param ("modRelease") });
     fltEnv.setParameters ({ fltA, fltD, fltS, fltR });
+
+    // --- Qualité : 0 ECO (aucun suréchantillonnage), 1 NORMAL (2x), 2 HAUTE (4x sur les oscillateurs)
+    {
+        const int q = (int) param ("quality");
+        osF = q >= 2 ? 4 : (q == 1 ? 2 : 1);
+        if (osF > 1 && oscDec.factor != osF)
+            oscDec.design (osF);
+    }
 
     // --- Filtre
     using FilterType = juce::dsp::StateVariableTPTFilterType;
@@ -843,6 +875,9 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         const bool  needB = levelBNow > 0.0f || fm > 0.001f || ring > 0.001f;
 
         float l = 0.0f, r = 0.0f;
+        auto oscStage = [&] (double step, float& oL, float& oR)
+        {
+        oL = oR = 0.0f;
         for (int u = 0; u < uni; ++u)
         {
             const auto k = (size_t) u;
@@ -864,14 +899,28 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
             if (ring > 0.001f)
                 s += ring * (sA * sB * 1.4f - s);
 
-            l += s * gainL[k];
-            r += s * gainR[k];
+            oL += s * gainL[k];
+            oR += s * gainR[k];
 
-            phasesA[k] += incA[k];
+            phasesA[k] += incA[k] * step;
             if (phasesA[k] >= 1.0) phasesA[k] -= 1.0;
-            phasesB[k] += incB[k];
+            phasesB[k] += incB[k] * step;
             if (phasesB[k] >= 1.0) phasesB[k] -= 1.0;
         }
+        };
+
+        if (osF > 1)
+        {
+            for (int j = 0; j < osF; ++j)
+            {
+                float a, b;
+                oscStage (1.0 / (double) osF, a, b);
+                oscDec.push (a, b);
+            }
+            oscDec.out (l, r);
+        }
+        else
+            oscStage (1.0, l, r);
 
         // Sub (sinus au centre)
         if (subAmt > 0.0f)
@@ -912,7 +961,16 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
 
         // Saturation avant le filtre
         const float driveNow = juce::jlimit (0.0f, 1.0f, drive + tgt[8]);
-        if (driveNow > 0.001f)
+        if (osF > 1)
+        {
+            const float d = 1.0f + driveNow * 10.0f;
+            const float inv = 1.0f / std::tanh (d);
+            float wl, wr, d0l, d0r;
+            driveOs.run (l, r, driveNow > 0.001f, [&] (float x) { return std::tanh (x * d) * inv; }, wl, wr, d0l, d0r);
+            l = d0l + driveNow * (wl - d0l);
+            r = d0r + driveNow * (wr - d0r);
+        }
+        else if (driveNow > 0.001f)
         {
             const float d = 1.0f + driveNow * 10.0f;
             const float inv = 1.0f / std::tanh (d);
@@ -1021,7 +1079,14 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
 
         // Distorsion (après le filtre)
         const float dAmt = juce::jlimit (0.0f, 1.0f, distAmt + tgt[18]);
-        if (dAmt > 0.001f)
+        if (osF > 1 && distType != 3)
+        {
+            float wl, wr, d0l, d0r;
+            distOs.run (l, r, dAmt > 0.001f, [&] (float x) { return distShape (distType, dAmt, x); }, wl, wr, d0l, d0r);
+            l = d0l + distMix * (wl - d0l);
+            r = d0r + distMix * (wr - d0r);
+        }
+        else if (dAmt > 0.001f)
         {
             float wl, wr;
             if (distType == 3)
@@ -1335,6 +1400,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addFloat ("glide",     "Glide (s)", NormalisableRange<float> (0.0f, 2.0f, 0.0f, 0.4f), 0.08f);
     addInt   ("bendRange", "Pitch Bend (demi-tons)", 1, 24, 2);
     addFloat ("master",    "Volume", NormalisableRange<float> (0.0f, 1.5f), 1.0f);
+    addChoice ("quality",   "Qualite", StringArray { "ECO", "NORMAL", "HAUTE" }, 1);
 
     // Effets
     addFloat ("chorusMix",   "Chorus Mix", unit, 0.0f);
@@ -1408,7 +1474,7 @@ MonSyntheProcessor::MonSyntheProcessor()
     }
 
     synth.addSound (new SynthSound());
-    for (int i = 0; i < 8; ++i)               // 8 voix de polyphonie
+    for (int i = 0; i < 16; ++i)              // 16 voix de polyphonie (les queues longues des nappes en consomment beaucoup)
         synth.addVoice (new SynthVoice (apvts, bank, modWheel, hostBpm));
 }
 
@@ -1845,6 +1911,14 @@ void MonSyntheProcessor::applyEffects (juce::AudioBuffer<float>& buffer)
     const float master = param ("master");
     buffer.applyGainRamp (0, numSamples, lastMaster, master);
     lastMaster = master;
+
+    // Fondu pendant un changement de preset (évite le coup de volume pendant que les réglages se mettent en place)
+    {
+        const float target = presetLoading.load() ? 0.0f : 1.0f;
+        if (loadGain != 1.0f || target != 1.0f)
+            buffer.applyGainRamp (0, numSamples, loadGain, target);
+        loadGain = target;
+    }
 
     // Limiteur de sortie : protège contre les saturations, surtout avec les presets plus forts
     if (numCh == 2)
@@ -2395,16 +2469,22 @@ void MonSyntheProcessor::loadFactoryPreset (int index)
     if (! juce::isPositiveAndBelow (index, (int) presets.size()))
         return;
 
-    // 1) tout remettre aux valeurs par défaut (sauf le séquenceur et le volume général)
+    // 0) fondu de sortie le temps de changer les réglages (le son qui joue ne subit pas les valeurs intermédiaires)
+    presetLoading = true;
+    juce::Thread::sleep (30);
+
+    // 1) tout remettre aux valeurs par défaut (sauf le séquenceur, le volume général et la qualité)
     for (auto* prm : getParameters())
         if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (prm))
-            if (! rp->paramID.startsWith ("seq") && rp->paramID != "master")
+            if (! rp->paramID.startsWith ("seq") && rp->paramID != "master" && rp->paramID != "quality")
                 rp->setValueNotifyingHost (rp->getDefaultValue());
 
     // 2) appliquer les réglages du preset
     for (const auto& kv : presets[(size_t) index].values)
         if (auto* rp = apvts.getParameter (kv.first))
             rp->setValueNotifyingHost (rp->convertTo0to1 (kv.second));
+
+    presetLoading = false;
 }
 
 void MonSyntheProcessor::setThemeHue (float hue, bool save)

@@ -596,6 +596,7 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     setupCombo (delaySync, "delaySync", 4);  setupCombo (delayMode, "delayMode", 4);
     setupCombo (noiseType, "noiseType", 5);  setupCombo (phaseMode, "phaseMode", 0);
     setupCombo (distType, "distType", 4);
+    setupCombo (quality, "quality", 5);
 
     styleButton (monoButton, 2);
     monoButton.setButtonText ("MONO");
@@ -964,6 +965,7 @@ void MonSyntheEditor::updateMenuVisibility()
     eqTypeBox.setVisible (currentMenu == mEq);
     phaseMode.box.setVisible (currentMenu == mPitch);
     distType.box.setVisible (currentMenu == mDisto);
+    quality.box.setVisible (currentMenu == mMaster);
 
     const bool specA = ! isMatrix && def.vizA == VizSpectrum;
     const bool specB = ! isMatrix && ! specA && def.vizB == VizSpectrum;
@@ -1200,6 +1202,7 @@ void MonSyntheEditor::resized()
             lfo3Shape.box.setBounds (first);    lfo3Sync.box.setBounds (second);
             monoButton.setBounds (first);
             noiseType.box.setBounds (first);    phaseMode.box.setBounds (first);    distType.box.setBounds (first);
+            quality.box.setBounds (first);
         }
         else
         {

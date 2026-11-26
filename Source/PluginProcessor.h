@@ -258,6 +258,104 @@ private:
     float velocity = 0.0f;
     float noteRandom = 0.0f;       // valeur aléatoire tirée à chaque note (-1..1)
     bool keyDown = false;
+    bool fastRel = false;          // fondu rapide (5 ms) quand une note est coupée sans queue
+    int  osF = 1;                  // facteur de suréchantillonnage courant (1, 2 ou 4)
+
+    // Décimateur FIR (fenêtre de Kaiser, 70 dB) : ramène un signal suréchantillonné à la fréquence normale.
+    // Le retard est toujours de 16 échantillons à la fréquence normale, quel que soit le facteur.
+    struct Decim
+    {
+        static constexpr int maxTaps = 129;
+        std::array<float, maxTaps> h {};
+        std::array<float, 2 * maxTaps> hl {}, hr {};
+        int taps = 65, factor = 2, pos = 0;
+
+        static double bessel0 (double x)
+        {
+            double s = 1.0, t = 1.0;
+            for (int k = 1; k < 40; ++k) { const double q = x / (2.0 * k); t *= q * q; s += t; }
+            return s;
+        }
+
+        void design (int f)
+        {
+            factor = f;
+            taps = f >= 4 ? 129 : 65;
+            const double A = 70.0, beta = 0.1102 * (A - 8.7);
+            const double trans = (A - 8.0) / (2.285 * juce::MathConstants<double>::twoPi * (double) (taps - 1));
+            const double fc = 0.5 / (double) f - trans * 0.5;
+            const int M = (taps - 1) / 2;
+            std::array<double, maxTaps> tmp {};
+            double sum = 0.0;
+            for (int n = 0; n < taps; ++n)
+            {
+                const double x = (double) (n - M);
+                const double sinc = n == M ? 2.0 * fc : std::sin (juce::MathConstants<double>::twoPi * fc * x) / (juce::MathConstants<double>::pi * x);
+                const double q = x / (double) M;
+                tmp[(size_t) n] = sinc * bessel0 (beta * std::sqrt (juce::jmax (0.0, 1.0 - q * q))) / bessel0 (beta);
+                sum += tmp[(size_t) n];
+            }
+            for (int n = 0; n < taps; ++n)
+                h[(size_t) n] = (float) (tmp[(size_t) n] / sum);
+            reset();
+        }
+
+        void reset() { hl.fill (0.0f); hr.fill (0.0f); pos = 0; }
+
+        void push (float l, float r) noexcept
+        {
+            pos = pos + 1 >= taps ? 0 : pos + 1;
+            hl[(size_t) pos] = hl[(size_t) (pos + taps)] = l;
+            hr[(size_t) pos] = hr[(size_t) (pos + taps)] = r;
+        }
+
+        void out (float& l, float& r) const noexcept
+        {
+            const float* a = hl.data() + pos + 1;
+            const float* b = hr.data() + pos + 1;
+            float sl = 0.0f, sr = 0.0f;
+            for (int k = 0; k < taps; ++k) { sl += h[(size_t) k] * a[k]; sr += h[(size_t) k] * b[k]; }
+            l = sl; r = sr;
+        }
+    };
+
+    // Traitement non linéaire en 2x : deux échantillons (milieu interpolé + courant) passent dans la fonction,
+    // puis décimation. Le signal sec est retardé de 16 échantillons pour rester aligné avec le signal traité.
+    struct Os2
+    {
+        Decim dec;
+        float pl = 0.0f, pr = 0.0f;
+        std::array<float, 16> dl {}, dr {};
+        int dp = 0;
+
+        Os2() { dec.design (2); }
+        void reset() { dec.reset(); pl = pr = 0.0f; dl.fill (0.0f); dr.fill (0.0f); dp = 0; }
+
+        template <class F>
+        void run (float l, float r, bool active, F sh, float& wl, float& wr, float& dryL, float& dryR)
+        {
+            dryL = dl[(size_t) dp];  dryR = dr[(size_t) dp];
+            dl[(size_t) dp] = l;     dr[(size_t) dp] = r;
+            dp = (dp + 1) & 15;
+            const float ml = 0.5f * (pl + l), mr = 0.5f * (pr + r);
+            pl = l; pr = r;
+            if (active)
+            {
+                dec.push (sh (ml), sh (mr));
+                dec.push (sh (l), sh (r));
+                dec.out (wl, wr);
+            }
+            else
+            {
+                dec.push (ml, mr);
+                dec.push (l, r);
+                wl = dryL; wr = dryR;
+            }
+        }
+    };
+
+    Decim oscDec;
+    Os2 driveOs, distOs;
 };
 
 //==============================================================================
@@ -385,6 +483,8 @@ private:
     juce::dsp::Limiter<float> limiter;
     juce::AudioBuffer<float> dryBuffer;          // copie du signal pour le mix parallèle du compresseur
     float lastMaster = 1.0f;
+    float loadGain = 1.0f;                       // fondu au changement de preset
+    std::atomic<bool> presetLoading { false };
 
     // EQ 8 bandes (page EQ)
     struct EqBand

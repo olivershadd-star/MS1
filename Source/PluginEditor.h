@@ -420,7 +420,7 @@ private:
     std::array<Knob*, 12> mixAmt {};
 
     NamedCombo tableA, tableB, warpA, warpB, filterType, lfoShape, lfoSync, lfo2Shape, lfo2Sync, lfo3Shape, lfo3Sync, lfo4Shape, lfo4Sync, delaySync, delayMode,
-               noiseType, phaseMode, distType, f2Type, f2Mode, dwSync;
+               noiseType, phaseMode, distType, f2Type, f2Mode, dwSync, quality;
     juce::TextButton monoButton;
     std::unique_ptr<APVTS::ButtonAttachment> monoAttachment;
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> captions;
