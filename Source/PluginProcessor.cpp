@@ -1413,7 +1413,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addFloat ("glide",     "Glide (s)", NormalisableRange<float> (0.0f, 2.0f, 0.0f, 0.4f), 0.08f);
     addInt   ("bendRange", "Pitch Bend (demi-tons)", 1, 24, 2);
     addFloat ("master",    "Volume", NormalisableRange<float> (0.0f, 1.5f), 1.0f);
-    addChoice ("quality",   "Qualite", StringArray { "ECO", "NORMAL", "HAUTE" }, 1);
+    addChoice ("quality",   "Qualite", StringArray { "QUALITE ECO", "QUALITE NORMAL", "QUALITE HAUTE" }, 1);
 
     // Effets
     addFloat ("chorusMix",   "Chorus Mix", unit, 0.0f);

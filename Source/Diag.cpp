@@ -176,6 +176,27 @@ int main()
         std::printf ("%s : %.1f dB\n", name, inharmonicDb (r.m, hz (72)));
     }
 
+    std::printf ("\n== C2. QUALITE : repliement et CPU selon le reglage Qualite (0 ECO, 1 NORMAL, 2 HAUTE)\n");
+    for (int q = 0; q < 3; ++q)
+    {
+        for (auto [name, id, val] : std::vector<std::tuple<const char*, const char*, float>> {
+                 { "FM 0.5", "fmAmount", 0.5f }, { "WARP A 0.6", "warpAmtA", 0.6f }, { "DISTO 0.7", "distAmt", 0.7f } })
+        {
+            proc.loadFactoryPreset (0);
+            setP (proc, "quality", (float) q);
+            setP (proc, "cutoff", 20000.0f); setP (proc, "unison", 1.0f); setP (proc, "oscBLevel", 0.6f);
+            if (std::string (id) == "warpAmtA") setP (proc, "warpModeA", 3.0f);
+            if (std::string (id) == "distAmt") { setP (proc, "distType", 1.0f); setP (proc, "distMix", 1.0f); }
+            setP (proc, id, val);
+            auto r = render (proc, { 72 }, 1.2, 0.1);
+            std::printf ("qualite %d  %s : %.1f dB\n", q, name, inharmonicDb (r.m, hz (72)));
+        }
+        proc.loadFactoryPreset (0);
+        setP (proc, "quality", (float) q); setP (proc, "unison", 7.0f); setP (proc, "oscBLevel", 0.6f); setP (proc, "fmAmount", 0.3f);
+        auto rc = render (proc, { 48, 52, 55, 59, 60, 64, 67, 71 }, 2.0, 0.5);
+        std::printf ("qualite %d  CPU 8 notes, unison 7, osc B + FM : %.1f%%\n", q, rc.cpu * 100.0);
+    }
+
     // ------------------------------------------------------------------ D. Sensibilite des potards
     std::printf ("\n== D. POTARDS : changement audible entre minimum et maximum (dB moyen par bande ; <1,5 = presque rien)\n");
     struct K { const char* id; const char* label; float lo, hi; };
