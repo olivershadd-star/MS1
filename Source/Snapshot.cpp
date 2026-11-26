@@ -24,7 +24,8 @@ int main()
                            { "rack.png", find ("Fold Bass"), 22 },
                            { "matrice.png", find ("Reese Noir"), 23 },
                            { "eq.png", find ("Shimmer Pad"), 20 },
-                           { "dessin.png", find ("Pompe Dessinee"), 14 } };
+                           { "dessin.png", find ("Pompe Dessinee"), 14 },
+                           { "master.png", find ("Reese Noir"), 21 } };
 
     std::unique_ptr<juce::AudioProcessorEditor> base (proc.createEditor());
     auto* ed = dynamic_cast<MonSyntheEditor*> (base.get());
