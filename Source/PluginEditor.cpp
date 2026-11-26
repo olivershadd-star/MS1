@@ -1563,6 +1563,10 @@ void MonSyntheEditor::drawLogo (juce::Graphics& g, juce::Rectangle<int> area)
                 juce::Justification::centredLeft, false);
     g.setColour (Pal::dim);
     g.setFont (Pal::mono (8.5f * scale));
+   #ifdef MS1_VERSION_TEXT
+    g.drawText (MS1_VERSION_TEXT, juce::Rectangle<float> (tx + 52.0f * scale, r.getY() + r.getHeight() * 0.14f, 80.0f * scale, r.getHeight() * 0.3f),
+                juce::Justification::centredLeft, false);
+   #endif
     g.drawText ("WAVETABLE SYNTH", juce::Rectangle<float> (tx, r.getY() + r.getHeight() * 0.58f, 130.0f * scale, r.getHeight() * 0.36f),
                 juce::Justification::centredLeft, false);
 }

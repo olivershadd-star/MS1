@@ -18,7 +18,22 @@
 
 ---
 
-> **Statut : version de test.** MS1 est un synthétiseur complet mais encore en développement. Il est fait pour être joué, tordu et massacré (techno, indus, sound design), pas pour être « propre ». Des bugs et des niveaux à ajuster sont possibles : les retours sont les bienvenus.
+## Télécharger
+
+<div align="center">
+
+[![Télécharger MS1](https://img.shields.io/badge/%E2%AC%87_T%C3%89L%C3%89CHARGER_MS1-derni%C3%A8re_version-42C77A?style=for-the-badge&labelColor=10151E)](https://github.com/olivershadd-star/MS1/releases/latest)
+
+</div>
+
+1. Clique sur le bouton vert ci-dessus, puis sur le fichier **`MS1-vX-Windows.zip`** (pas besoin de compte).
+2. Décompresse le zip (clic droit, *Extraire tout*).
+3. Copie le dossier **`MS1.vst3`** dans `C:\Program Files\Common Files\VST3`.
+4. Dans Ableton : *Préférences → Plug-ins → Rescan*. MS1 apparaît sous **VST3 → ANKS Labs**.
+
+Sans logiciel de musique, lance simplement `MS1-Standalone.exe`. Le numéro de version est affiché à côté du logo dans le plugin.
+
+> **Version de test** : MS1 est complet mais encore en développement. Des bugs et des niveaux à ajuster sont possibles, les retours sont les bienvenus.
 
 ## Présentation
 
@@ -66,16 +81,6 @@ Il est écrit en C++ avec JUCE par **ANKS Labs**, sans reprendre ni code ni inte
 - **213 presets d'usine**, niveaux calibrés.
 - **MIDI learn** sur n'importe quel potard.
 
-## Installation
-
-1. Ouvre l'onglet **[Actions](https://github.com/olivershadd-star/MS1/actions)** du dépôt.
-2. Choisis le dernier build vert (workflow **Build VST3**).
-3. Télécharge l'artefact **MS1-VST3-Windows** (il faut être connecté à GitHub).
-4. Décompresse et copie le dossier `MS1.vst3` dans `C:\Program Files\Common Files\VST3`.
-5. Relance la détection des plugins dans ton hôte (Ableton : *Préférences → Plug-ins → Rescan*). Le plugin apparaît sous l'éditeur **ANKS Labs**.
-
-Un artefact est un build de test : il expire au bout de quelques semaines. Prérequis : Windows 64 bits, hôte compatible VST3. Le mode Standalone est aussi compilé.
-
 ## Raccourcis et ergonomie
 
 Survole un potard avec la souris : sa **valeur réelle** s'affiche dans la barre du bas.
@@ -98,8 +103,9 @@ Dans certains hôtes, le clavier de l'ordinateur ne parvient pas toujours à la 
 
 - Code dans `Source/`, projet CMake (JUCE 8.0.4, récupéré à la compilation).
 - Compilation locale : `cmake -B build -A x64` puis `cmake --build build --config Release`.
-- Workflows GitHub Actions :
-  - **Build VST3** : compile le plugin.
+- Workflows GitHub Actions (onglet Actions) :
+  - **Build VST3** : compile à chaque modification (artefact de test, réservé aux développeurs).
+  - **Release** : publie une version dans *Releases* (lancement manuel, avec le numéro de version).
   - **Preset check** : mesure chaque preset (niveau, silence, saturation).
   - **Snapshot** : génère des captures de l'interface.
 - Les presets d'usine sont générés dans `Source/FactoryBank.cpp`.

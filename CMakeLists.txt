@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
-project(MS1 VERSION 0.1.0)
+project(MS1 VERSION 0.2.0)
+
+# Numéro de build (fourni par GitHub Actions) affiché dans le plugin
+set(MS1_BUILD 0 CACHE STRING "Numéro de build")
+add_compile_definitions(MS1_VERSION_TEXT="v${PROJECT_VERSION} b${MS1_BUILD}")
 
 include(FetchContent)
 FetchContent_Declare(JUCE
@@ -9,7 +13,7 @@ FetchContent_Declare(JUCE
 FetchContent_MakeAvailable(JUCE)
 
 juce_add_plugin(MS1
-    COMPANY_NAME "ANKS Lab"
+    COMPANY_NAME "ANKS Labs"
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
     PLUGIN_MANUFACTURER_CODE Anks

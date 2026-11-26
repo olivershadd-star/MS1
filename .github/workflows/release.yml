@@ -1,0 +1,48 @@
+name: Release
+# Publie une version téléchargeable (sans compte GitHub) dans l'onglet « Releases ».
+# Lancement : Actions > Release > Run workflow, puis saisir le numéro (ex. 0.2.0).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Numéro de version (ex. 0.2.0)"
+        required: true
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compiler
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64 -DMS1_BUILD=${{ github.run_number }}
+          cmake --build build --config Release --parallel
+      - name: Préparer le zip
+        shell: bash
+        run: |
+          V="${{ github.event.inputs.version }}"
+          D="MS1-v$V-Windows"
+          mkdir -p "$D"
+          cp -r build/MS1_artefacts/Release/VST3/MS1.vst3 "$D/"
+          cp build/MS1_artefacts/Release/Standalone/MS1.exe "$D/MS1-Standalone.exe" || true
+          cat > "$D/LISEZ-MOI.txt" <<'TXT'
+          MS1 - synthe a table d'onde - ANKS Labs (gratuit)
+
+          INSTALLATION (VST3, Windows 64 bits)
+          1. Copie le dossier "MS1.vst3" dans :
+             C:\Program Files\Common Files\VST3
+          2. Dans Ableton : Preferences > Plug-ins > Rescan.
+          3. MS1 apparait dans Plug-ins > VST3 > ANKS Labs.
+
+          Sans hote : lance MS1-Standalone.exe.
+          TXT
+          7z a "$D.zip" "$D" > /dev/null
+      - name: Publier
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${{ github.event.inputs.version }}"
+          gh release create "v$V" "MS1-v$V-Windows.zip" --title "MS1 v$V" --latest \
+            --notes "Telecharge **MS1-v$V-Windows.zip**, decompresse, puis suis LISEZ-MOI.txt. Build ${{ github.run_number }}."
