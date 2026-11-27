@@ -1459,20 +1459,20 @@ void MonSyntheEditor::resized()
     {
         auto& r = rack[(size_t) s];
         const int x = 194 + s * 204, w = 196;
-        r.area = R (x, 88, w, 388);
-        r.onBtn.setBounds (R (x + 6, 108, 84, 24));
-        r.leftBtn.setBounds (R (x + 96, 108, 44, 24));
-        r.rightBtn.setBounds (R (x + 146, 108, 44, 24));
-        r.typeBox.setBounds (R (x + 6, 138, w - 12, 26));
-        placeKnob (r.k[0], R (x + 4, 172, 94, 84));
-        placeKnob (r.k[1], R (x + 98, 172, 94, 84));
-        placeKnob (r.k[2], R (x + 4, 260, 94, 84));
-        placeKnob (r.k[3], R (x + 98, 260, 94, 84));
-        placeKnob (r.k[4], R (x + 6, 352, w - 12, 26));
+        r.area = R (x, 118, w, 356);
+        r.onBtn.setBounds (R (x + 6, 140, 84, 24));
+        r.leftBtn.setBounds (R (x + 96, 140, 44, 24));
+        r.rightBtn.setBounds (R (x + 146, 140, 44, 24));
+        r.typeBox.setBounds (R (x + 6, 170, w - 12, 26));
+        placeKnob (r.k[0], R (x + 4, 202, 94, 76));
+        placeKnob (r.k[1], R (x + 98, 202, 94, 76));
+        placeKnob (r.k[2], R (x + 4, 282, 94, 76));
+        placeKnob (r.k[3], R (x + 98, 282, 94, 76));
+        placeKnob (r.k[4], R (x + 6, 364, w - 12, 26));
     }
 
     // Matrice (occupe les deux écrans)
-    matrixArea = R (194, 88, 808, 388);
+    matrixArea = R (194, 116, 808, 358);
     {
         const int x0 = matrixArea.getX();
         mixHdrSrc.setBounds (x0, matrixArea.getY(), S (220.0f), S (22.0f));
@@ -1482,11 +1482,11 @@ void MonSyntheEditor::resized()
 
         for (int i = 0; i < 12; ++i)
         {
-            const int y = matrixArea.getY() + S (26.0f) + i * S (29.0f) + S (2.0f);
-            mixSrcBox[(size_t) i].setBounds (x0, y, S (220.0f), S (25.0f));
-            mixDstBox[(size_t) i].setBounds (x0 + S (256.0f), y, S (220.0f), S (25.0f));
-            placeKnob (mixAmt[(size_t) i], juce::Rectangle<int> (x0 + S (496.0f), y, S (190.0f), S (25.0f)));
-            mixCrvBox[(size_t) i].setBounds (x0 + S (696.0f), y, S (112.0f), S (25.0f));
+            const int y = matrixArea.getY() + S (26.0f) + i * S (27.0f) + S (2.0f);
+            mixSrcBox[(size_t) i].setBounds (x0, y, S (220.0f), S (23.0f));
+            mixDstBox[(size_t) i].setBounds (x0 + S (256.0f), y, S (220.0f), S (23.0f));
+            placeKnob (mixAmt[(size_t) i], juce::Rectangle<int> (x0 + S (496.0f), y, S (190.0f), S (23.0f)));
+            mixCrvBox[(size_t) i].setBounds (x0 + S (696.0f), y, S (112.0f), S (23.0f));
         }
     }
 
@@ -1876,10 +1876,10 @@ void MonSyntheEditor::paint (juce::Graphics& g)
         g.setColour (Pal::dim);
         for (int i = 0; i < 12; ++i)
         {
-            const int y = matrixArea.getY() + S (26.0f) + i * S (29.0f) + S (2.0f);
-            g.drawText ("->", matrixArea.getX() + S (222.0f), y, S (32.0f), S (25.0f), juce::Justification::centred, false);
+            const int y = matrixArea.getY() + S (26.0f) + i * S (27.0f) + S (2.0f);
+            g.drawText ("->", matrixArea.getX() + S (222.0f), y, S (32.0f), S (23.0f), juce::Justification::centred, false);
             g.setColour (Pal::line);
-            g.drawHorizontalLine (matrixArea.getY() + S (26.0f) + (i + 1) * S (29.0f) - S (2.0f),
+            g.drawHorizontalLine (matrixArea.getY() + S (26.0f) + (i + 1) * S (27.0f) - S (2.0f),
                                   (float) matrixArea.getX(), (float) matrixArea.getRight());
             g.setColour (Pal::dim);
         }
@@ -2677,6 +2677,7 @@ void MonSyntheEditor::selectEqBand (int band)
     {
         fixedKnobs[i]->label.setText (labels[i], juce::dontSendNotification);
         fixedKnobs[i]->attachment = std::make_unique<APVTS::SliderAttachment> (proc.apvts, ids[i], fixedKnobs[i]->slider);
+        applyKnobText (*fixedKnobs[i]);
     }
 
     eqOnAtt.reset();
