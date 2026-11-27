@@ -10,13 +10,30 @@ namespace
         g.strokePath (p, juce::PathStrokeType (w, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
 
-    float lfoShapeValue (int shape, double ph)
+    float vizRandom (int cycle)
     {
+        juce::uint32 x = (juce::uint32) (cycle * 2654435761u + 12345u);
+        x ^= x >> 15;  x *= 2246822519u;  x ^= x >> 13;
+        return (float) (x >> 8) / 8388608.0f - 1.0f;
+    }
+
+    // u : position en cycles (0..2 sur l'écran) ; les formes aléatoires utilisent un motif fixe pour l'affichage
+    float lfoShapeValue (int shape, double u)
+    {
+        const int cycle = (int) std::floor (u);
+        const double ph = u - (double) cycle;
         switch (shape)
         {
             case 0:  return std::sin ((float) (ph * juce::MathConstants<double>::twoPi));
             case 1:  return 1.0f - 4.0f * std::abs ((float) ph - 0.5f);
             case 2:  return (float) (2.0 * ph - 1.0);
+            case 4:  return (float) (1.0 - 2.0 * ph);
+            case 5:  return vizRandom (cycle);
+            case 6:
+            {
+                const float t = (float) ph;
+                return vizRandom (cycle) + (vizRandom (cycle + 1) - vizRandom (cycle)) * (t * t * (3.0f - 2.0f * t));
+            }
             default: return ph < 0.5 ? 1.0f : -1.0f;
         }
     }
@@ -518,7 +535,17 @@ const MonSyntheEditor::MenuDef& MonSyntheEditor::menuAt (int index)
         { "ENV FILTRE", 4, VizEnvFilter, VizFilter, { { "fltAttack", "ATTACK" }, { "fltDecay", "DECAY" },
                                                     { "fltSustain", "SUSTAIN" }, { "fltRelease", "RELEASE" },
                                                     { "fltEnvAmount", "ENV > CUTOFF" }, { "velFilter", "VEL > FILTRE" },
-                                                    { "cutoff", "CUTOFF" }, { "resonance", "RESO" } } }
+                                                    { "cutoff", "CUTOFF" }, { "resonance", "RESO" } } },
+        { "RESONATEUR", 3, VizModal, VizSpectrum, { { "rsLevel", "NIVEAU" }, { "rsDecay", "DUREE" },
+                                                    { "rsDamp", "AMORTI AIGUS" }, { "rsStretch", "INHARMONIQUE" },
+                                                    { "rsPos", "POINT DE FRAPPE" }, { "rsBurst", "DUREE DU CHOC" },
+                                                    { "rsBright", "DURETE DU CHOC" }, { "rsTune", "ACCORD" } } },
+        { "CORPS",     3, VizModal, VizSpectrum,  { { "rsFeed", "ENTREE OSC" }, { "rsDry", "SON DIRECT" },
+                                                    { "rsLevel", "NIVEAU" }, { "rsDamp", "AMORTI AIGUS" } } },
+        { "TIMBRE",    5, VizTimbre, VizEnvAmp,   { { "tbAmt", "QUANTITE" }, { "tbDecay", "DUREE" },
+                                                    { "tbEnd", "BRILLANCE FINALE" }, { "tbVel", "VELOCITE" },
+                                                    { "fltKey", "FILTRE/CLAVIER" }, { "ampKey", "NIVEAU/CLAVIER" },
+                                                    { "lfoFade", "LFO MONTEE" } } }
     };
     return defs[juce::jlimit (0, numMenus - 1, index)];
 }
@@ -527,9 +554,9 @@ const MonSyntheEditor::FamilyDef& MonSyntheEditor::familyAt (int index)
 {
     static const FamilyDef defs[10] =
     {
-        { "OSC",     0, 5, { mOscA, mOscB, mFmRingUni, mNoiseStr, mPitchJeu } },
+        { "OSC",     0, 7, { mOscA, mOscB, mFmRingUni, mNoiseStr, mPitchJeu, mReso, mBody } },
         { "FILTRE",  4, 3, { mFilter, mFilter2, mDisto } },
-        { "ENV",     5, 3, { mEnvAmp, mEnvMod, mEnvFlt } },
+        { "ENV",     5, 4, { mEnvAmp, mEnvMod, mEnvFlt, mTimbre } },
         { "LFO",     1, 2, { mLfo, mLfo34 } },
         { "FX",      3, 4, { mChorus, mPhaser, mDelay, mReverb } },
         { "MASTER",  0, 2, { mEq, mMaster } },
@@ -726,6 +753,7 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     setupCombo (noiseType, "noiseType", 5);  setupCombo (phaseMode, "phaseMode", 0);
     setupCombo (distType, "distType", 4);
     setupCombo (quality, "quality", 5);
+    setupCombo (rsMat, "rsMat", 3);
 
     styleButton (monoButton, 2);
     monoButton.setButtonText ("MONO");
@@ -1133,6 +1161,7 @@ void MonSyntheEditor::updateMenuVisibility()
         b.setVisible (currentMenu == mDraw);
     f2Type.box.setVisible (currentMenu == mFilter2);
     f2Mode.box.setVisible (currentMenu == mFilter2);
+    rsMat.box.setVisible (currentMenu == mReso);
     lfoShape.box.setVisible (currentMenu == mLfo);
     lfoSync.box.setVisible (currentMenu == mLfo);
     lfo2Shape.box.setVisible (currentMenu == mLfo);
@@ -1273,6 +1302,8 @@ void MonSyntheEditor::updateLeds()
             case mNoiseStr:  lvl = (pv ("noiseLevel") > 0.01f || pv ("strLevel") > 0.01f) ? 0.3f + 0.7f * pulse (4.0, 0.0) : 0.12f;  break;
             case mPitchJeu:  lvl = (std::abs (pv ("pitchEnvAmt")) > 0.5f || pv ("mono") > 0.5f) ? (active ? 1.0f : 0.6f) : 0.12f;  break;
             case mEnvFlt:    lvl = active ? 0.35f + 0.65f * pulse (1.9, 0.7) : 0.12f;     break;
+            case mReso: case mBody: lvl = pv ("rsLevel") > 0.01f ? (active ? 0.4f + 0.6f * pulse (3.1, 0.2) : 0.6f) : 0.12f;  break;
+            case mTimbre:    lvl = (pv ("tbAmt") > 0.01f || pv ("fltKey") > 0.01f || std::abs (pv ("ampKey")) > 0.05f) ? 0.7f : 0.12f;  break;
             case mPhaser: lvl = pv ("phaserMix") > 0.01f ? 0.45f + 0.55f * pulse (pv ("phaserRate"), 0.0) : 0.12f; break;
             case mChorus: lvl = pv ("chorusMix") > 0.01f ? 0.45f + 0.55f * pulse (pv ("chorusRate"), 0.0) : 0.12f; break;
             case mDelay:  lvl = pv ("delayMix") > 0.01f
@@ -1424,6 +1455,7 @@ void MonSyntheEditor::resized()
             lfo3Shape.box.setBounds (first);    lfo3Sync.box.setBounds (second);
             noiseType.box.setBounds (first);    phaseMode.box.setBounds (first);    distType.box.setBounds (first);
             quality.box.setBounds (first);
+            rsMat.box.setBounds (first);
         }
         else
         {
@@ -2054,6 +2086,8 @@ void MonSyntheEditor::drawViz (juce::Graphics& g, int viz, juce::Rectangle<float
         case VizReverb:    drawReverbViz (g, r, colour);       break;
         case VizNoise:     drawNoiseViz (g, r, colour);        break;
         case VizString:    drawStringViz (g, r, colour);       break;
+        case VizModal:     drawModalViz (g, r, colour);        break;
+        case VizTimbre:    drawTimbreViz (g, r, colour);       break;
         case VizPitch:     drawPitchViz (g, r, colour);        break;
         case VizDisto:     drawDistoViz (g, r, colour);        break;
         case VizComp:      drawCompViz (g, r, colour);         break;
@@ -2306,34 +2340,139 @@ void MonSyntheEditor::drawLfoViz (juce::Graphics& g, juce::Rectangle<float> r, j
     g.setColour (Pal::line.brighter (0.3f).withAlpha (0.6f));
     g.drawHorizontalLine ((int) area.getCentreY(), area.getX(), area.getRight());
 
-    auto yAt = [&] (float ph) { return area.getCentreY() - lfoShapeValue (shape, ph) * depth * area.getHeight() * 0.45f; };
+    auto yAt = [&] (double u) { return area.getCentreY() - lfoShapeValue (shape, u) * depth * area.getHeight() * 0.45f; };
+
+    // Durée d'un cycle : libre (1 / vitesse) ou calée sur le tempo (nombre de temps par cycle)
+    const double cycleSec = sync > 0 ? MonSyntheProcessor::lfoBeatsPerCycle (sync) * 60.0 / bpm : 1.0 / juce::jmax (0.01, (double) rate);
+    const double hzReal = 1.0 / cycleSec;
+
+    // Grille de temps : un trait par cycle, une graduation en secondes sous la courbe
+    g.setFont (Pal::mono (9.0f * scale));
+    for (int k = 0; k <= 2; ++k)
+    {
+        const float gx = area.getX() + area.getWidth() * (float) k * 0.5f;
+        g.setColour (Pal::line.withAlpha (k == 1 ? 0.7f : 0.4f));
+        g.drawVerticalLine ((int) gx, area.getY(), area.getBottom());
+        g.setColour (Pal::dim);
+        const juce::String t = juce::String ((double) k * cycleSec, cycleSec < 1.0 ? 2 : 1) + " s";
+        g.drawText (t, juce::Rectangle<float> (gx - 30.0f * scale, area.getBottom() + 2.0f * scale, 60.0f * scale, 12.0f * scale),
+                    k == 0 ? juce::Justification::centredLeft : (k == 2 ? juce::Justification::centredRight : juce::Justification::centred), false);
+    }
 
     juce::Path p;
-    const int n = 200;
+    const int n = 240;
     for (int i = 0; i <= n; ++i)
     {
-        const float u = (float) i / (float) n * 2.0f;
-        const float ph = u - std::floor (u);
+        const double u = (double) i / (double) n * 2.0;
         const float x = area.getX() + area.getWidth() * (float) i / (float) n;
-        const float y = yAt (i == n ? 0.9999f : ph);
+        const float y = yAt (i == n ? 1.9999 : u);
         if (i == 0) p.startNewSubPath (x, y); else p.lineTo (x, y);
     }
     glowStroke (g, p, colour, 2.0f * scale);
 
-    const double hz = sync > 0 ? bpm / 60.0 : (double) rate;
-    const float f = (float) std::fmod (nowSeconds() * juce::jmin (hz, 8.0), 1.0);
+    // Point qui parcourt la courbe à la vraie vitesse (ralenti au-delà de 8 Hz pour rester lisible)
+    const double f = std::fmod (nowSeconds() * juce::jmin (hzReal, 8.0), 1.0);
     g.setColour (colour.brighter (0.6f));
     for (int k = 0; k < 2; ++k)
     {
-        const float x = area.getX() + area.getWidth() * (f + (float) k) * 0.5f;
+        const float x = area.getX() + area.getWidth() * ((float) f + (float) k) * 0.5f;
         g.fillEllipse (x - 4.0f * scale, yAt (f) - 4.0f * scale, 8.0f * scale, 8.0f * scale);
     }
 
     const auto syncNames = MonSyntheProcessor::lfoSyncNames();
     g.setFont (Pal::mono (10.5f * scale, true));
     g.setColour (Pal::text);
+    auto top = r.removeFromTop (14.0f * scale);
     g.drawText ("LFO " + juce::String (which + 1) + "   "
-                    + (sync > 0 ? syncNames[juce::jlimit (0, syncNames.size() - 1, sync)] : juce::String (rate, 2) + " Hz"),
+                    + (sync > 0 ? "SYNC " + syncNames[juce::jlimit (0, syncNames.size() - 1, sync)] : juce::String (rate, 2) + " Hz")
+                    + "   =   1 cycle toutes les " + juce::String (cycleSec, cycleSec < 1.0 ? 3 : 2) + " s",
+                top, juce::Justification::centredLeft, false);
+    if (sync > 0)
+    {
+        g.setColour (colour.brighter (0.4f));
+        g.setFont (Pal::mono (9.5f * scale));
+        g.drawText ("Sync tempo actif : le potard VITESSE est ignore (choisis 'libre' pour l'utiliser)",
+                    r.removeFromTop (12.0f * scale), juce::Justification::centredLeft, false);
+    }
+    else
+    {
+        g.setColour (Pal::dim);
+        g.setFont (Pal::mono (9.5f * scale));
+        g.drawText ("Pour l'assigner : clic droit sur n'importe quel potard > Moduler ce reglage",
+                    r.removeFromTop (12.0f * scale), juce::Justification::centredLeft, false);
+    }
+}
+
+// Résonateur : un trait par mode (position = fréquence en rapport de la fondamentale, hauteur = niveau, épaisseur = durée)
+void MonSyntheEditor::drawModalViz (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour colour)
+{
+    const int mat = (int) pv ("rsMat");
+    const float stretch = pv ("rsStretch"), damp = pv ("rsDamp"), decay = pv ("rsDecay"), pos = pv ("rsPos");
+    const float level = pv ("rsLevel"), feed = pv ("rsFeed");
+    static const char* names[] = { "CORDE", "BARRE", "MARIMBA", "CLOCHE", "TUBE", "PLAQUE", "BOL" };
+
+    float ratio[ms::ModalBank::maxModes] {}, amp[ms::ModalBank::maxModes] {};
+    const int cnt = ms::ModalBank::ratios (mat, stretch, ratio, amp);
+    const auto area = r.reduced (8.0f * scale, 26.0f * scale);
+    const float maxR = 12.0f;
+
+    g.setColour (Pal::line.withAlpha (0.5f));
+    g.drawHorizontalLine ((int) area.getBottom(), area.getX(), area.getRight());
+    for (int i = 0; i < cnt; ++i)
+    {
+        const float comb = std::fabs (std::sin (juce::MathConstants<float>::pi * ratio[i] * pos));
+        const float a = amp[i] * ((mat == 0 || mat == 4) ? 0.12f + 0.88f * comb : 0.45f + 0.55f * comb);
+        const float x = area.getX() + area.getWidth() * (std::log2 (juce::jmax (0.4f, ratio[i])) + 1.3f) / (std::log2 (maxR) + 1.3f);
+        const float tk = juce::jmax (0.01f, decay * std::pow (juce::jmax (ratio[i], 0.25f), -damp * 1.2f));
+        const float h = area.getHeight() * juce::jlimit (0.04f, 1.0f, a);
+        const float wdt = juce::jlimit (2.0f, 9.0f, (2.0f + 2.2f * std::log10 (1.0f + tk * 10.0f)) * scale);
+        g.setColour (colour.withAlpha (0.25f + 0.75f * juce::jlimit (0.0f, 1.0f, level * 2.0f)));
+        g.fillRect (juce::Rectangle<float> (x - wdt * 0.5f, area.getBottom() - h, wdt, h));
+        g.setColour (colour.brighter (0.5f));
+        g.fillEllipse (x - 2.5f * scale, area.getBottom() - h - 2.5f * scale, 5.0f * scale, 5.0f * scale);
+    }
+
+    g.setFont (Pal::mono (10.5f * scale, true));
+    g.setColour (Pal::text);
+    g.drawText (juce::String (names[juce::jlimit (0, 6, mat)]) + "   " + juce::String (cnt) + " modes   duree " + juce::String (decay, 2)
+                    + " s" + (feed > 0.01f ? "   + SIGNAL OSC" : juce::String()),
+                r.removeFromTop (14.0f * scale), juce::Justification::centredLeft, false);
+    g.setColour (Pal::dim);
+    g.setFont (Pal::mono (9.0f * scale));
+    g.drawText ("hauteur = niveau, largeur = duree de chaque mode", r.removeFromBottom (12.0f * scale), juce::Justification::centredLeft, false);
+}
+
+// Timbre : brillance (coupure) en fonction du temps depuis le debut de la note
+void MonSyntheEditor::drawTimbreViz (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour colour)
+{
+    const float amt = pv ("tbAmt"), tau = pv ("tbDecay"), endOct = pv ("tbEnd"), velScale = 1.0f - pv ("tbVel") * 0.4f;
+    const auto area = r.reduced (8.0f * scale, 26.0f * scale);
+    const float fEnd = juce::jlimit (100.0f, 18000.0f, 261.6f * std::exp2 (endOct));
+    const float span = std::log2 (20000.0f / fEnd);
+    const float total = juce::jmax (0.1f, 4.0f * tau);
+
+    juce::Path p;
+    const int n = 160;
+    for (int i = 0; i <= n; ++i)
+    {
+        const float t = total * (float) i / (float) n;
+        const float fc = fEnd * std::exp2 (span * amt * velScale * std::exp (-t / tau));
+        const float y = area.getBottom() - area.getHeight() * std::log2 (juce::jmax (50.0f, fc) / 50.0f) / std::log2 (20000.0f / 50.0f);
+        const float x = area.getX() + area.getWidth() * (float) i / (float) n;
+        if (i == 0) p.startNewSubPath (x, y); else p.lineTo (x, y);
+    }
+    glowStroke (g, p, colour, 2.0f * scale);
+
+    g.setFont (Pal::mono (9.0f * scale));
+    g.setColour (Pal::dim);
+    for (int k = 0; k <= 4; ++k)
+        g.drawText (juce::String (total * (float) k / 4.0f, 2) + " s",
+                    juce::Rectangle<float> (area.getX() + area.getWidth() * (float) k / 4.0f - 28.0f * scale, area.getBottom() + 2.0f * scale, 56.0f * scale, 12.0f * scale),
+                    k == 0 ? juce::Justification::centredLeft : (k == 4 ? juce::Justification::centredRight : juce::Justification::centred), false);
+    g.setFont (Pal::mono (10.5f * scale, true));
+    g.setColour (Pal::text);
+    g.drawText (amt > 0.01f ? "TIMBRE : les aigus s'eteignent en " + juce::String (tau, 2) + " s  (courbe = brillance de la note)"
+                            : juce::String ("TIMBRE : inactif (QUANTITE = 0)"),
                 r.removeFromTop (14.0f * scale), juce::Justification::centredLeft, false);
 }
 
@@ -3617,6 +3756,37 @@ void DrawLfoView::paint (juce::Graphics& g)
     }
     g.setColour (col);
     g.strokePath (line, juce::PathStrokeType (2.0f));
+
+    // Indication de temps : durée d'un cycle, d'un pas, et graduations en secondes (ou en temps si synchro)
+    {
+        const int sync = (int) proc.apvts.getRawParameterValue ("dwSync")->load();
+        const float rate = proc.apvts.getRawParameterValue ("dwRate")->load();
+        const double bpm = proc.getHostBpm() > 1.0 ? proc.getHostBpm() : 120.0;
+        const double cycleSec = sync > 0 ? MonSyntheProcessor::lfoBeatsPerCycle (sync) * 60.0 / bpm : 1.0 / juce::jmax (0.01, (double) rate);
+        const double stepMs = cycleSec * 1000.0 / (double) n;
+
+        g.setFont (Pal::mono (9.0f));
+        for (int k = 0; k <= 4; ++k)
+        {
+            const float x = r.getX() + r.getWidth() * (float) k / 4.0f;
+            const juce::String t = juce::String (cycleSec * (double) k / 4.0, cycleSec < 2.0 ? 2 : 1) + " s";
+            g.setColour (Pal::dim);
+            g.drawText (t, juce::Rectangle<float> (x - 28.0f, r.getBottom() - 13.0f, 56.0f, 12.0f),
+                        k == 0 ? juce::Justification::centredLeft : (k == 4 ? juce::Justification::centredRight : juce::Justification::centred), false);
+        }
+        g.setFont (Pal::mono (10.5f, true));
+        g.setColour (Pal::text);
+        g.drawText ("1 CYCLE = " + juce::String (cycleSec, cycleSec < 1.0 ? 3 : 2) + " s  (" + juce::String (n) + " pas de "
+                        + juce::String (stepMs, stepMs < 100.0 ? 1 : 0) + " ms)"
+                        + (sync > 0 ? "   SYNC TEMPO " + MonSyntheProcessor::lfoSyncNames()[juce::jlimit (0, 8, sync)] + " : VITESSE ignoree" : juce::String()),
+                    juce::Rectangle<float> (r.getX() + 6.0f, r.getY() + 3.0f, r.getWidth() - 12.0f, 14.0f), juce::Justification::centredLeft, false);
+
+        // curseur : position courante dans le cycle (même vitesse que la voix, ralenti au-delà de 8 Hz)
+        const double hz = juce::jmin (1.0 / cycleSec, 8.0);
+        const float f = (float) std::fmod (juce::Time::getMillisecondCounterHiRes() * 0.001 * hz, 1.0);
+        g.setColour (col.brighter (0.6f).withAlpha (0.8f));
+        g.drawVerticalLine ((int) (r.getX() + r.getWidth() * f), r.getY(), r.getBottom());
+    }
 }
 
 //==============================================================================

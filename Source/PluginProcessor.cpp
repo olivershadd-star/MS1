@@ -116,7 +116,8 @@ float WavetableBank::harmonicAmp (int tableIndex, int frame, int h)
 // (même principe que les tables classiques), par FFT inverse. Construites une seule fois pour tout le processus.
 struct AkwfData
 {
-    std::vector<float> data;
+    static constexpr float scale = 1.0f / 16384.0f;     // int16 : 2x de marge au-dessus de 1,0 (surcharge de Gibbs)
+    std::vector<juce::int16> data;
     std::array<int, WavetableBank::numAkwf> frames {};
     std::array<size_t, WavetableBank::numAkwf> offset {};
 };
@@ -182,7 +183,7 @@ static std::shared_ptr<const AkwfData> buildAkwfData()
         pos += count * 2;
         out->frames[(size_t) t] = nf;
         out->offset[(size_t) t] = out->data.size();
-        out->data.resize (out->data.size() + (size_t) nf * numLevels * N, 0.0f);
+        out->data.resize (out->data.size() + (size_t) nf * numLevels * N, (juce::int16) 0);
         coefs.push_back (std::move (v));
     }
 
@@ -190,22 +191,64 @@ static std::shared_ptr<const AkwfData> buildAkwfData()
     for (size_t t = 0; t < coefs.size(); ++t)
     {
         const int nf = out->frames[t];
+        double prevShift = 0.0;
         for (int f = 0; f < nf; ++f)
         {
             const juce::int16* c = coefs[t].data() + (size_t) f * NH * 2;
+
+            // Alignement de phase : chaque forme d'onde est décalée dans le temps pour que son harmonique dominante
+            // (parmi 1 à 3) ait toujours la même phase. Le fondu entre deux formes voisines ne fait plus d'annulations.
+            std::vector<float> re ((size_t) NH + 1, 0.0f), im ((size_t) NH + 1, 0.0f);
+            for (int k = 1; k <= NH; ++k)
+            {
+                re[(size_t) k] = (float) c[2 * (k - 1)] * q * gRe;
+                im[(size_t) k] = (float) c[2 * (k - 1) + 1] * q * gIm;
+            }
+            {
+                int m = 1;
+                double best = 1.25 * std::hypot ((double) re[1], (double) im[1]);
+                for (int k = 2; k <= 3; ++k)
+                {
+                    const double mag = std::hypot ((double) re[(size_t) k], (double) im[(size_t) k]);
+                    if (mag > best) { best = mag; m = k; }
+                }
+                double shift = prevShift;
+                if (best > 1.0e-4)
+                {
+                    const double arg = std::atan2 ((double) im[(size_t) m], (double) re[(size_t) m]);
+                    double nearest = 1.0e9;
+                    for (int j = 0; j < m; ++j)
+                    {
+                        double cand = (arg + juce::MathConstants<double>::twoPi * j) / (double) m;
+                        double d = cand - prevShift;
+                        d -= juce::MathConstants<double>::twoPi * std::floor (d / juce::MathConstants<double>::twoPi + 0.5);
+                        if (std::abs (d) < std::abs (nearest)) { nearest = d; shift = prevShift + d; }
+                    }
+                }
+                prevShift = shift;
+                for (int k = 1; k <= NH; ++k)
+                {
+                    const double a = -(double) k * shift;
+                    const float cr = (float) std::cos (a), sr = (float) std::sin (a);
+                    const float r0 = re[(size_t) k], i0 = im[(size_t) k];
+                    re[(size_t) k] = r0 * cr - i0 * sr;
+                    im[(size_t) k] = r0 * sr + i0 * cr;
+                }
+            }
+
             float scale = 1.0f;
             for (int level = 0; level < numLevels; ++level)
             {
                 std::fill (spec.begin(), spec.end(), 0.0f);
-                const int maxH = juce::jmin (NH, 512 >> level);
+                const int maxH = juce::jmin (NH, ms::maxHarmonicsForLevel (level));
                 for (int k = 1; k <= maxH; ++k)
                 {
-                    spec[(size_t) (2 * k)]     = (float) c[2 * (k - 1)] * q * gRe;
-                    spec[(size_t) (2 * k + 1)] = (float) c[2 * (k - 1) + 1] * q * gIm;
+                    spec[(size_t) (2 * k)]     = re[(size_t) k];
+                    spec[(size_t) (2 * k + 1)] = im[(size_t) k];
                 }
                 fft.performRealOnlyInverseTransform (spec.data());
 
-                float* dst = out->data.data() + out->offset[t] + (size_t) (f * numLevels + level) * N;
+                juce::int16* dst = out->data.data() + out->offset[t] + (size_t) (f * numLevels + level) * N;
                 if (level == 0)
                 {
                     float peak = 0.0f;
@@ -213,7 +256,7 @@ static std::shared_ptr<const AkwfData> buildAkwfData()
                     scale = peak > 1.0e-6f ? 1.0f / peak : 1.0f;     // même facteur pour toutes les versions d'une forme d'onde
                 }
                 for (int i = 0; i < N; ++i)
-                    dst[i] = spec[(size_t) i] * scale;
+                    dst[i] = (juce::int16) juce::roundToInt (juce::jlimit (-1.99f, 1.99f, spec[(size_t) i] * scale) / AkwfData::scale);
             }
         }
     }
@@ -248,7 +291,7 @@ WavetableBank::WavetableBank()
             int h = 1;
             for (int level = numLevels - 1; level >= 0; --level)
             {
-                const int maxHarmonics = 512 >> level;
+                const int maxHarmonics = ms::maxHarmonicsForLevel (level);
 
                 for (; h <= maxHarmonics; ++h)
                 {
@@ -282,14 +325,31 @@ WavetableBank::WavetableBank()
 
 int WavetableBank::levelForFrequency (double hz) noexcept
 {
-    return juce::jlimit (0, numLevels - 1, (int) std::floor (std::log2 (juce::jmax (1.0, hz) / 20.0)));
+    return ms::levelForFrequencyHalfOctave (hz, numLevels);
+}
+
+// Lecture d'une table : interpolation cubique (4 points) dans la forme d'onde, fondu linéaire entre deux formes voisines.
+template <class T>
+static inline float readFrames (const T* a, const T* b, int i0, float fr, float fm, float gain) noexcept
+{
+    constexpr int mask = WavetableBank::tableSize - 1;
+    const int im1 = (i0 - 1) & mask, ip1 = (i0 + 1) & mask, ip2 = (i0 + 2) & mask;
+    float sa = ms::cubic4 ((float) a[im1], (float) a[i0], (float) a[ip1], (float) a[ip2], fr);
+    if (fm > 1.0e-4f)
+    {
+        const float sb = ms::cubic4 ((float) b[im1], (float) b[i0], (float) b[ip1], (float) b[ip2], fr);
+        sa += (sb - sa) * fm;
+    }
+    return sa * gain;
 }
 
 float WavetableBank::getSample (int tableIndex, float pos, int level, double phase) const noexcept
 {
     const int idx = juce::jlimit (0, totalTables - 1, tableIndex);
+    level = juce::jlimit (0, numLevels - 1, level);
 
     const float* base = nullptr;
+    const juce::int16* ibase = nullptr;
     int frames = numFrames;
 
     if (idx < numClassic)
@@ -303,7 +363,7 @@ float WavetableBank::getSample (int tableIndex, float pos, int level, double pha
         if (frames <= 0)
             return 0.0f;
 
-        base = ak->data.data() + ak->offset[(size_t) t];
+        ibase = ak->data.data() + ak->offset[(size_t) t];
     }
     else
     {
@@ -321,17 +381,16 @@ float WavetableBank::getSample (int tableIndex, float pos, int level, double pha
     const int f1 = juce::jmin (f0 + 1, frames - 1);
     const float fm = fpos - (float) f0;
 
-    const float x = (float) (phase * tableSize);
-    const int i0 = (int) x & (tableSize - 1);
-    const int i1 = (i0 + 1) & (tableSize - 1);
-    const float fr = x - std::floor (x);
+    const double xp = phase * (double) tableSize;
+    const int i0 = (int) xp & (tableSize - 1);
+    const float fr = (float) (xp - std::floor (xp));
 
-    const float* a = base + (size_t) (f0 * numLevels + level) * tableSize;
-    const float* b = base + (size_t) (f1 * numLevels + level) * tableSize;
+    if (ibase != nullptr)
+        return readFrames (ibase + (size_t) (f0 * numLevels + level) * tableSize,
+                           ibase + (size_t) (f1 * numLevels + level) * tableSize, i0, fr, fm, AkwfData::scale);
 
-    const float sa = a[i0] + (a[i1] - a[i0]) * fr;
-    const float sb = b[i0] + (b[i1] - b[i0]) * fr;
-    return sa + (sb - sa) * fm;
+    return readFrames (base + (size_t) (f0 * numLevels + level) * tableSize,
+                       base + (size_t) (f1 * numLevels + level) * tableSize, i0, fr, fm, 1.0f);
 }
 
 void WavetableBank::setUserTable (int slot, const std::vector<float>& frames, int numUserFrames)
@@ -376,7 +435,7 @@ void WavetableBank::setUserTable (int slot, const std::vector<float>& frames, in
 
         for (int level = numLevels - 1; level >= 0; --level)
         {
-            const int maxHarmonics = 512 >> level;
+            const int maxHarmonics = ms::maxHarmonicsForLevel (level);
 
             for (; harmonic <= maxHarmonics; ++harmonic)
             {
@@ -504,6 +563,7 @@ void SynthVoice::prepare (double sampleRate, int blockSize)
     oscDec.design (2);
     driveOs.reset();
     distOs.reset();
+    distOs4.reset();
 
     juce::dsp::ProcessSpec spec { sr, (juce::uint32) blockSize, 2 };   // filtres stéréo
     filter.prepare (spec);
@@ -601,8 +661,17 @@ void SynthVoice::startNote (int midiNote, float vel, juce::SynthesiserSound*, in
 
     pitchEnvVal = 1.0f;
     noiseEnvVal = 1.0f;
+    excEnv = 1.0f;
+    tbEnv = 1.0f;
+    noteSamples = 0.0;
+    excSeed = (0x2545F491u ^ ((juce::uint32) midiNote * 2654435761u)) | 1u;      // fixe par note : une corde pincee sonne pareil a chaque fois
+    modalDirty = true;
     if (! cont)
     {
+        modal.reset();
+        excLp = 0.0f;
+        tbS1[0] = tbS1[1] = tbS2[0] = tbS2[1] = 0.0f;
+        for (size_t k = 0; k < 4; ++k) { rndCur[k] = rng.nextFloat() * 2.0f - 1.0f; rndNext[k] = rng.nextFloat() * 2.0f - 1.0f; }
         for (auto& n : noiseGen)
             n = NoiseGen();
         crushCount = 0;
@@ -614,6 +683,7 @@ void SynthVoice::startNote (int midiNote, float vel, juce::SynthesiserSound*, in
         oscDec.reset();
         driveOs.reset();
         distOs.reset();
+        distOs4.reset();
     }
     for (auto& b : combBuf)
         b.fill (0.0f);
@@ -708,8 +778,6 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     {
         const int q = (int) param ("quality");
         osF = q >= 2 ? 4 : (q == 1 ? 2 : 1);
-        if (osF > 1 && oscDec.factor != osF)
-            oscDec.design (osF);
     }
 
     // --- Filtre
@@ -801,6 +869,16 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         }
     }
 
+    // FM marquée (réglage ou route de matrice) : les oscillateurs passent en 4x même en qualité NORMAL (l'FM a un spectre très large)
+    bool fmRouted = false;
+    for (int s = 0; s < numSlots; ++s)
+        if (slots[(size_t) s].dst == 16)
+            fmRouted = true;
+    const int osOsc = osF;      // (FM : le modulateur est déjà adouci ; le 4x reste réservé à la qualité HAUTE)
+    (void) fmRouted;
+    if (osOsc > 1 && oscDec.factor != osOsc)
+        oscDec.design (osOsc);
+
     // --- Modulation de la position de wavetable (LFO + enveloppe)
     position.setTargetValue (param ("position"));
     const float  modAmount = param ("modAmount");
@@ -868,6 +946,37 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     const float  strA = 0.5f + 0.5f * param ("strDamp");
     const double strFactor = std::pow (2.0, (double) param ("strTune") / 1200.0);
 
+    // --- Résonateur modal (corps / corde / barre / cloche / tube), timbre qui évolue, suivi du clavier
+    const float rsLevel   = param ("rsLevel");
+    const bool  rsOn      = rsLevel > 0.001f;
+    const int   rsMat     = (int) param ("rsMat");
+    const float rsFeed    = param ("rsFeed");
+    const float rsDry     = param ("rsDry");
+    const float rsDecay   = param ("rsDecay");
+    const float rsDamp    = param ("rsDamp");
+    const float rsPos     = param ("rsPos");
+    const float rsStretch = param ("rsStretch");
+    const double rsTuneF  = std::pow (2.0, (double) param ("rsTune") / 1200.0);
+    const float rsBurst   = param ("rsBurst");
+    const float rsBright  = param ("rsBright");
+    {
+        const std::array<float, 6> now { (float) rsMat, rsDecay, rsDamp, rsPos, rsStretch, rsOn ? 1.0f : 0.0f };
+        if (now != rsPrev) { rsPrev = now; modalDirty = true; }
+    }
+    const float excTau  = juce::jmax (0.0003f, rsBurst * 0.001f) * (float) sr;
+    const float excCoef = std::exp (-1.0f / excTau);
+    const float excA    = juce::jlimit (0.015f, 1.0f, 0.02f * std::exp2 (rsBright * 5.6f + (velocity - 0.5f) * 2.0f));
+    const float excComp = juce::jmin (6.0f, std::sqrt ((2.0f - excA) / excA));
+    const float excGain = 0.5f * (0.3f + 0.7f * velocity) / std::sqrt (juce::jmax (1.0f, excTau * 0.5f)) * excComp;
+
+    const float tbAmt   = param ("tbAmt");
+    const float tbEnd   = param ("tbEnd");
+    const float tbVel   = param ("tbVel");
+    const float tbCoef  = std::exp (-1.0f / (juce::jmax (0.01f, param ("tbDecay")) * (float) sr));
+    const float fltKey  = param ("fltKey");
+    const float ampKey  = param ("ampKey");
+    const float lfoFade = param ("lfoFade");
+
     // --- Warp, FM, ring
     const int   warpModeA  = (int) param ("warpModeA");
     const int   warpModeB  = (int) param ("warpModeB");
@@ -898,6 +1007,20 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         const double freq  = freqBase * factorA;
         const double freqB = freqBase * factorB;
 
+        baseFreqNow = freqBase;
+        keyOct = (float) ((currentNote - 60.0) / 12.0);
+        keyGainNow = ampKey != 0.0f ? juce::Decibels::decibelsToGain (ampKey * keyOct) : 1.0f;
+        if (rsOn)
+        {
+            const double fs = freqBase * rsTuneF;
+            if (modalDirty || modalF <= 0.0 || std::abs (fs / modalF - 1.0) > 2.0e-4)
+            {
+                modal.setup (sr, fs, rsMat, rsStretch, rsDecay, rsDamp, rsPos);
+                modalF = fs;
+                modalDirty = false;
+            }
+        }
+
         for (int u = 0; u < uni; ++u)
         {
             const auto k = (size_t) u;
@@ -918,30 +1041,44 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         mipB = WavetableBank::levelForFrequency (freqB * maxRatio);
     };
 
+    // LFO : formes classiques + dent de scie descendante, aléatoire par pas (échantillonné-bloqué) et aléatoire lissé
+    auto lfoAt = [&] (int idx, int shape, double& phase, double inc) -> float
+    {
+        float v;
+        switch (shape)
+        {
+            case 4:  v = (float) (1.0 - 2.0 * phase); break;
+            case 5:  v = rndCur[(size_t) idx]; break;
+            case 6:
+            {
+                const float t = (float) phase;
+                v = rndCur[(size_t) idx] + (rndNext[(size_t) idx] - rndCur[(size_t) idx]) * (t * t * (3.0f - 2.0f * t));
+                break;
+            }
+            default: v = lfoValue (shape, phase); break;
+        }
+        phase += inc;
+        if (phase >= 1.0)
+        {
+            phase -= 1.0;
+            rndCur[(size_t) idx] = rndNext[(size_t) idx];
+            rndNext[(size_t) idx] = rng.nextFloat() * 2.0f - 1.0f;
+        }
+        return v;
+    };
+
     const int pitchStep = (std::abs (pitchAmt) > 0.01f || pitchModulated) ? 8 : 32;     // mise à jour plus fine pour une chute de hauteur rapide
 
     for (int i = 0; i < numSamples; ++i)
     {
-        // Sources de modulation
-        const float lfo = lfoValue (lfoShape, lfoPhase);
-        lfoPhase += lfoInc;
-        if (lfoPhase >= 1.0)
-            lfoPhase -= 1.0;
+        // Sources de modulation (les 4 LFO partagent une montée progressive éventuelle)
+        const float fadeG = lfoFade > 0.001f ? (float) juce::jmin (1.0, noteSamples / ((double) lfoFade * sr)) : 1.0f;
+        noteSamples += 1.0;
 
-        const float lfo2 = lfoValue (lfo2Shape, lfo2Phase);
-        lfo2Phase += lfo2Inc;
-        if (lfo2Phase >= 1.0)
-            lfo2Phase -= 1.0;
-
-        const float lfo3 = lfoValue (lfo3Shape, lfo3Phase);
-        lfo3Phase += lfo3Inc;
-        if (lfo3Phase >= 1.0)
-            lfo3Phase -= 1.0;
-
-        const float lfo4 = lfoValue (lfo4Shape, lfo4Phase);
-        lfo4Phase += lfo4Inc;
-        if (lfo4Phase >= 1.0)
-            lfo4Phase -= 1.0;
+        const float lfo  = lfoAt (0, lfoShape,  lfoPhase,  lfoInc)  * fadeG;
+        const float lfo2 = lfoAt (1, lfo2Shape, lfo2Phase, lfo2Inc) * fadeG;
+        const float lfo3 = lfoAt (2, lfo3Shape, lfo3Phase, lfo3Inc) * fadeG;
+        const float lfo4 = lfoAt (3, lfo4Shape, lfo4Phase, lfo4Inc) * fadeG;
 
         // LFO dessiné : 2 à 32 pas, du escalier (lissage 0) à la rampe continue (lissage 1)
         float drawVal;
@@ -1014,17 +1151,21 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
             const auto k = (size_t) u;
 
             float sB = 0.0f;
+            const double phB = warpPhase (warpModeB, warpB, phasesB[k]);
+            const int lvB = mipB + warpMipExtra (warpModeB, warpB);
             if (needB)
-                sB = bank.getSample (tabB, posBNow, juce::jmin (mipB + warpMipExtra (warpModeB, warpB), WavetableBank::numLevels - 1), warpPhase (warpModeB, warpB, phasesB[k]));
+                sB = bank.getSample (tabB, posBNow, juce::jmin (lvB, WavetableBank::numLevels - 1), phB);
 
             double phaseA = phasesA[k];
             if (fm > 0.001f)
             {
-                phaseA += (double) (fm * 1.5f * sB);
+                // le modulateur est lu avec moins d'harmoniques : un front raide ferait sauter la phase de A (repliement)
+                const float sMod = bank.getSample (tabB, posBNow, juce::jmin (lvB + (fm > 0.6f ? 6 : (fm > 0.35f ? 4 : 2)), WavetableBank::numLevels - 1), phB);
+                phaseA += (double) (fm * 1.5f * sMod);
                 phaseA -= std::floor (phaseA);
             }
 
-            const float sA = bank.getSample (tabA, posA, juce::jmin (mipA + warpMipExtra (warpModeA, warpA) + (fm > 0.7f ? 2 : (fm > 0.3f ? 1 : 0)), WavetableBank::numLevels - 1), warpPhase (warpModeA, warpA, phaseA));
+            const float sA = bank.getSample (tabA, posA, juce::jmin (mipA + warpMipExtra (warpModeA, warpA) + (fm > 0.85f ? 8 : (fm > 0.6f ? 6 : (fm > 0.35f ? 4 : (fm > 0.15f ? 2 : 0)))), WavetableBank::numLevels - 1), warpPhase (warpModeA, warpA, phaseA));
 
             float s = levelA * sA + levelBNow * sB;
             if (ring > 0.001f)
@@ -1043,21 +1184,21 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         // Le suréchantillonnage ne sert que si FM, ring ou warp créent des harmoniques au-delà de la limite ;
         // sinon les tables (déjà limitées en bande) passent directement, avec le même retard de 16 échantillons.
         const bool needOs = fm > 0.001f || ring > 0.001f || (warpModeA != 0 && warpA > 0.001f) || (warpModeB != 0 && warpB > 0.001f);
-        if (osF > 1 && needOs)
+        if (osOsc > 1 && needOs)
         {
-            for (int j = 0; j < osF; ++j)
+            for (int j = 0; j < osOsc; ++j)
             {
                 float a, b;
-                oscStage (1.0 / (double) osF, a, b);
+                oscStage (1.0 / (double) osOsc, a, b);
                 oscDec.push (a, b);
             }
             oscDec.out (l, r);
         }
-        else if (osF > 1)
+        else if (osOsc > 1)
         {
             float a, b;
             oscStage (1.0, a, b);
-            for (int j = 0; j < osF; ++j)
+            for (int j = 0; j < osOsc; ++j)
                 oscDec.push (a, b);              // garde l'historique du filtre à jour pour une bascule sans à-coup
             l = oDlyL[(size_t) oDlyPos];  r = oDlyR[(size_t) oDlyPos];
             oDlyL[(size_t) oDlyPos] = a;  oDlyR[(size_t) oDlyPos] = b;
@@ -1103,6 +1244,41 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
             r += nextNoise (noiseGen[1], noiseType, noiseTone) * nAmp;
         }
 
+        // Résonateur modal : un choc de bruit (marteau, plectre, archet, souffle) et/ou le signal des oscillateurs
+        // font vibrer un corps (corde, barre, cloche, tube, plaque, bol)
+        if (rsOn)
+        {
+            float exc = 0.0f;
+            if (excEnv > 1.0e-4f)
+            {
+                excSeed ^= excSeed << 13;  excSeed ^= excSeed >> 17;  excSeed ^= excSeed << 5;
+                const float nz = (float) (juce::int32) excSeed * (1.0f / 2147483648.0f);
+                excLp += excA * (nz - excLp);
+                exc = excLp * excEnv * excGain;
+                excEnv *= excCoef;
+            }
+            const float feed = rsFeed > 0.001f ? 0.5f * (l + r) * rsFeed : 0.0f;
+            const float y = modal.process (exc, feed) * rsLevel * 1.5f;
+            l = l * rsDry + y;
+            r = r * rsDry + y;
+        }
+
+        // Timbre qui évolue : les aigus s'éteignent plus vite que les graves (cordes, claviers, percussions)
+        if (tbAmt > 0.001f)
+        {
+            if ((i & 7) == 0)
+            {
+                const float fEnd = juce::jlimit (100.0f, 18000.0f, (float) baseFreqNow * std::exp2 (tbEnd));
+                const float span = std::log2 (20000.0f / fEnd);
+                const float velScale = 1.0f - tbVel * (1.0f - velocity);
+                const float fc = fEnd * std::exp2 (span * tbAmt * velScale * tbEnv);
+                tbA = 1.0f - std::exp (-juce::MathConstants<float>::twoPi * juce::jmin (fc, 20000.0f) / (float) sr);
+            }
+            tbEnv *= tbCoef;
+            tbS1[0] += tbA * (l - tbS1[0]);  tbS2[0] += tbA * (tbS1[0] - tbS2[0]);  l = tbS2[0];
+            tbS1[1] += tbA * (r - tbS1[1]);  tbS2[1] += tbA * (tbS1[1] - tbS2[1]);  r = tbS2[1];
+        }
+
         // Saturation avant le filtre
         const float driveNow = juce::jlimit (0.0f, 1.0f, drive + tgt[8]);
         if (osF > 1)
@@ -1110,7 +1286,8 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
             const float d = 1.0f + driveNow * 10.0f;
             const float inv = 1.0f / std::tanh (d);
             float wl, wr, d0l, d0r;
-            driveOs.run (l, r, driveNow > 0.001f, [&] (float x) { return std::tanh (x * d) * inv; }, wl, wr, d0l, d0r);
+            driveOs.runAdaa (l, r, driveNow > 0.001f, [&] (float x) { return std::tanh (x * d) * inv; },
+                             [&] (float x) { return ms::logCosh (x * d) * inv / d; }, wl, wr, d0l, d0r);
             l = d0l + driveNow * (wl - d0l);
             r = d0r + driveNow * (wr - d0r);
         }
@@ -1123,7 +1300,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         }
 
         // Filtre : enveloppe (jusqu'à +/- 5 octaves), matrice et vélocité
-        const float octaves = (fltAmount + tgt[10]) * fEnv * 5.0f + tgt[3] * 5.0f + velTerm;
+        const float octaves = (fltAmount + tgt[10]) * fEnv * 5.0f + tgt[3] * 5.0f + velTerm + fltKey * keyOct;
         const float cutoff = juce::jlimit (20.0f, 20000.0f, baseCutoff * std::exp2 (octaves));
         filter.setCutoffFrequency (cutoff);
         if (twoPole || notch)
@@ -1226,7 +1403,12 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         if (osF > 1 && distType != 3)
         {
             float wl, wr, d0l, d0r;
-            distOs.run (l, r, dAmt > 0.001f, [&] (float x) { return distShape (distType, dAmt, x); }, wl, wr, d0l, d0r);
+            if (distType == 2)          // repli d'onde : spectre infini, on suréchantillonne 4 fois
+                distOs4.runAdaa (l, r, dAmt > 0.001f, [&] (float x) { return distShape (distType, dAmt, x); },
+                                 [&] (float x) { return distAntiderivative (distType, dAmt, x); }, wl, wr, d0l, d0r);
+            else
+                distOs.runAdaa (l, r, dAmt > 0.001f, [&] (float x) { return distShape (distType, dAmt, x); },
+                                [&] (float x) { return distAntiderivative (distType, dAmt, x); }, wl, wr, d0l, d0r);
             l = d0l + distMix * (wl - d0l);
             r = d0r + distMix * (wr - d0r);
         }
@@ -1256,7 +1438,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
 
         // Volume
         const float ampMod = juce::jlimit (0.0f, 2.0f, 1.0f + tgt[9]);
-        const float env = adsr.getNextSample() * ampVel * ampMod * 0.45f * voiceGain;     // +5 dB par rapport à avant : les sons seuls (kicks, hats) étaient trop bas
+        const float env = adsr.getNextSample() * ampVel * ampMod * 0.45f * voiceGain * keyGainNow;     // +5 dB par rapport à avant : les sons seuls (kicks, hats) étaient trop bas
         l *= env;
         r *= env;
 
@@ -1393,6 +1575,28 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addFloat ("strBright", "Corde Brillance", unit, 0.7f);
     addFloat ("strTune",   "Corde Accord (cents)", NormalisableRange<float> (-100.0f, 100.0f), 0.0f);
 
+    // Resonateur modal : un choc (marteau, plectre, souffle) ou le signal des oscillateurs fait vibrer un corps
+    addFloat  ("rsLevel",   "Reso Niveau", unit, 0.0f);
+    addChoice ("rsMat",     "Reso Matiere", StringArray { "CORDE", "BARRE", "MARIMBA", "CLOCHE", "TUBE", "PLAQUE", "BOL" }, 0);
+    addFloat  ("rsDecay",   "Reso Duree (s)", NormalisableRange<float> (0.05f, 12.0f, 0.0f, 0.4f), 1.5f);
+    addFloat  ("rsDamp",    "Reso Amorti des aigus", unit, 0.5f);
+    addFloat  ("rsPos",     "Reso Point de frappe", NormalisableRange<float> (0.03f, 0.5f), 0.2f);
+    addFloat  ("rsStretch", "Reso Inharmonicite", unit, 0.0f);
+    addFloat  ("rsBurst",   "Reso Duree du choc (ms)", NormalisableRange<float> (0.3f, 120.0f, 0.0f, 0.4f), 3.0f);
+    addFloat  ("rsBright",  "Reso Durete du choc", unit, 0.6f);
+    addFloat  ("rsFeed",    "Reso Entree oscillateurs", unit, 0.0f);
+    addFloat  ("rsDry",     "Reso Son direct", unit, 1.0f);
+    addFloat  ("rsTune",    "Reso Accord (cents)", NormalisableRange<float> (-2400.0f, 2400.0f), 0.0f);
+
+    // Timbre qui evolue pendant la note, suivi du clavier
+    addFloat ("tbAmt",   "Timbre Quantite", unit, 0.0f);
+    addFloat ("tbDecay", "Timbre Duree (s)", NormalisableRange<float> (0.03f, 10.0f, 0.0f, 0.4f), 0.8f);
+    addFloat ("tbEnd",   "Timbre Brillance finale (oct)", NormalisableRange<float> (0.0f, 6.0f), 3.0f);
+    addFloat ("tbVel",   "Timbre Velocite", unit, 0.5f);
+    addFloat ("fltKey",  "Filtre suit le clavier", unit, 0.0f);
+    addFloat ("ampKey",  "Niveau suit le clavier (dB/oct)", NormalisableRange<float> (-6.0f, 6.0f), 0.0f);
+    addFloat ("lfoFade", "LFO Montee (s)", NormalisableRange<float> (0.0f, 6.0f, 0.0f, 0.5f), 0.0f);
+
     // Warp, FM et ring : de quoi travailler le son bien plus loin
     addChoice ("warpModeA", "Warp A Mode", warpModeNames(), 0);
     addFloat  ("warpAmtA",  "Warp A", NormalisableRange<float> (0.0f, 1.0f, 0.0f, 0.75f), 0.0f);
@@ -1439,19 +1643,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addFloat ("release", "Release", time, 0.3f);
 
     // LFO -> position de la wavetable
-    addChoice ("lfoShape", "LFO Forme", StringArray { "Sinus", "Triangle", "Saw", "Carre" }, 0);
+    addChoice ("lfoShape", "LFO Forme", lfoShapeNames(), 0);
     addFloat  ("lfoRate",  "LFO Vitesse (Hz)", NormalisableRange<float> (0.05f, 20.0f, 0.0f, 0.4f), 1.0f);
     addFloat  ("lfoDepth", "LFO Intensite", unit, 0.2f);
     addChoice ("lfoSync",  "LFO Sync", lfoSyncNames(), 0);
 
     // LFO 2 (utilisable uniquement via la matrice) et macros
-    addChoice ("lfo2Shape", "LFO2 Forme", StringArray { "Sinus", "Triangle", "Saw", "Carre" }, 0);
+    addChoice ("lfo2Shape", "LFO2 Forme", lfoShapeNames(), 0);
     addFloat  ("lfo2Rate",  "LFO2 Vitesse (Hz)", NormalisableRange<float> (0.05f, 20.0f, 0.0f, 0.4f), 0.5f);
     addChoice ("lfo2Sync",  "LFO2 Sync", lfoSyncNames(), 0);
-    addChoice ("lfo3Shape", "LFO3 Forme", StringArray { "Sinus", "Triangle", "Saw", "Carre" }, 1);
+    addChoice ("lfo3Shape", "LFO3 Forme", lfoShapeNames(), 1);
     addFloat  ("lfo3Rate",  "LFO3 Vitesse (Hz)", NormalisableRange<float> (0.05f, 20.0f, 0.0f, 0.4f), 2.0f);
     addChoice ("lfo3Sync",  "LFO3 Sync", lfoSyncNames(), 0);
-    addChoice ("lfo4Shape", "LFO4 Forme", StringArray { "Sinus", "Triangle", "Saw", "Carre" }, 2);
+    addChoice ("lfo4Shape", "LFO4 Forme", lfoShapeNames(), 2);
     addFloat  ("lfo4Rate",  "LFO4 Vitesse (Hz)", NormalisableRange<float> (0.05f, 20.0f, 0.0f, 0.4f), 0.25f);
     addChoice ("lfo4Sync",  "LFO4 Sync", lfoSyncNames(), 0);
     addFloat  ("macro1", "Macro 1", unit, 0.0f);
@@ -1644,8 +1848,7 @@ void MonSyntheProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     delayLine.prepare (spec);
     delayLine.reset();
 
-    reverb.setSampleRate (sampleRate);
-    reverb.reset();
+    reverb.prepare (sampleRate);
 
     phaser.prepare (spec);
     phaser.setMix (0.5f);
@@ -1989,14 +2192,7 @@ void MonSyntheProcessor::applyEffects (juce::AudioBuffer<float>& buffer)
     const float reverbMix = param ("reverbMix");
     if (reverbMix > 0.001f && numCh == 2 && numSamples <= reverbBuf.getNumSamples())
     {
-        juce::Reverb::Parameters rp;
-        rp.roomSize   = param ("reverbSize");
-        rp.damping    = param ("reverbDamp");
-        rp.wetLevel   = 0.33f;
-        rp.dryLevel   = 0.0f;
-        rp.width      = 1.0f;
-        rp.freezeMode = 0.0f;
-        reverb.setParameters (rp);
+        reverb.setParams (param ("reverbSize"), param ("reverbDamp"));
 
         const float preSamples = juce::jlimit (0.0f, (float) (sr * 0.24), (float) (param ("reverbPre") * 0.001 * sr));
         const float rLpA = 1.0f - std::exp (-juce::MathConstants<float>::twoPi * param ("reverbLP") / (float) sr);
@@ -2014,7 +2210,7 @@ void MonSyntheProcessor::applyEffects (juce::AudioBuffer<float>& buffer)
             }
         }
 
-        reverb.processStereo (reverbBuf.getWritePointer (0), reverbBuf.getWritePointer (1), numSamples);
+        reverb.process (reverbBuf.getWritePointer (0), reverbBuf.getWritePointer (1), numSamples);
 
         for (int ch = 0; ch < 2; ++ch)
         {
@@ -2240,7 +2436,7 @@ void MonSyntheProcessor::generateSequencerMidi (juce::MidiBuffer& midi, int numS
         const juce::int64 rel = seqNoteOffAbs - base;
         if (rel <= upTo)
         {
-            midi.addEvent (juce::MidiMessage::noteOff (1, seqNote), (int) juce::jmax<juce::int64> (0, rel));
+            midi.addEvent (juce::MidiMessage::noteOff (1, seqNote), (int) std::max<juce::int64> (0, rel));
             seqNote = -1;
         }
     };
@@ -2653,6 +2849,11 @@ bool MonSyntheProcessor::deletePreset (const juce::String& name)
 juce::StringArray MonSyntheProcessor::warpModeNames()
 {
     return { "OFF", "BEND+", "BEND-", "SYNC", "MIRROR", "ASYM", "FLIP", "QUANT", "PWM", "WOBBLE" };
+}
+
+juce::StringArray MonSyntheProcessor::lfoShapeNames()
+{
+    return { "Sinus", "Triangle", "Saw", "Carre", "Saw bas", "Hasard pas", "Hasard lisse" };
 }
 
 juce::StringArray MonSyntheProcessor::lfoSyncNames()

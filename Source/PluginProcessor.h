@@ -3,6 +3,7 @@
 #include <juce_dsp/juce_dsp.h>
 #include <array>
 #include "FxRack.h"
+#include "Engine.h"
 
 // Déformation de la phase d'un oscillateur ("warp") :
 // 0 OFF, 1 BEND+, 2 BEND-, 3 SYNC, 4 MIRROR, 5 ASYM, 6 FLIP, 7 QUANT, 8 PWM, 9 WOBBLE
@@ -66,12 +67,13 @@ inline int warpMipExtra (int mode, float amount) noexcept
 {
     if (mode <= 0 || amount <= 0.05f)
         return 0;
+    // unites : demi-octaves ; la phase deformee accelere la lecture de la table de ce facteur
     switch (mode)
     {
-        case 3:  return amount > 0.86f ? 3 : (amount > 0.43f ? 2 : 1);     // SYNC : x(1+7w)
-        case 4:  return amount > 0.67f ? 2 : 1;                            // MIRROR : x(1+3w)
-        case 7:  case 6:  return amount > 0.3f ? 1 : 0;                    // QUANT, FLIP : marches et cassures
-        case 1:  case 2:  return amount > 0.5f ? 1 : 0;                    // BEND : pente raide
+        case 3:  return (int) std::ceil (2.0f * std::log2 (1.0f + 7.0f * amount));     // SYNC : x(1+7w)
+        case 4:  return (int) std::ceil (2.0f * std::log2 (1.0f + 3.0f * amount));     // MIRROR : x(1+3w)
+        case 7:  case 6:  return amount > 0.3f ? 2 : 0;                                // QUANT, FLIP : marches et cassures
+        case 1:  case 2:  return (int) std::ceil (2.0f * std::log2 (1.0f + 4.0f * amount));   // BEND : pente raide
         default: return 0;
     }
 }
@@ -133,6 +135,27 @@ inline float distShape (int type, float amt, float x) noexcept
     }
 }
 
+// Primitive (antiderivee) de distShape pour l'antialiasing ADAA (types 0, 1, 2 et 4 ; le type 3 n'en a pas)
+inline float distAntiderivative (int type, float amt, float x) noexcept
+{
+    const float g = std::exp2 (amt * 5.0f);
+    switch (type)
+    {
+        case 0:  return 0.9f * ms::logCosh (g * x) / g;
+        case 1:
+        {
+            const float ax = std::fabs (x);
+            return 0.8f * (ax <= 1.0f / g ? 0.5f * g * x * x : ax - 0.5f / g);
+        }
+        case 2:  return -0.9f * std::cos (g * x * 1.5707963f) / (g * 1.5707963f);
+        default:
+        {
+            const float b = 0.6f * amt;
+            return 0.9f * (ms::logCosh (g * x + b) / g - std::tanh (b) * x);
+        }
+    }
+}
+
 // Coefficients d'une bande d'EQ : 0 COUPE-BAS, 1 SHELF GRAVE, 2 CLOCHE, 3 SHELF AIGU, 4 COUPE-HAUT
 inline juce::dsp::IIR::Coefficients<float>::Ptr makeEqCoefficients (int type, double sampleRate, float freq, float gainDb, float q)
 {
@@ -162,7 +185,7 @@ public:
     static constexpr int numFrames = 8;
     static constexpr int numAkwf = 16;          // ... + 16 wavetables riches (jusqu'à 64 formes d'onde), dérivées d'AKWF (CC0)
     static constexpr int numTables = numClassic + numAkwf;
-    static constexpr int numLevels = 10;
+    static constexpr int numLevels = 20;      // une version limitee en bande par demi-octave
     static constexpr int numUserTables = 2;     // + 2 emplacements pour tes propres fichiers .wav
     static constexpr int totalTables = numTables + numUserTables;
     static constexpr int maxUserFrames = 64;
@@ -372,45 +395,112 @@ private:
         }
     };
 
-    // Traitement non linéaire en 2x : deux échantillons (milieu interpolé + courant) passent dans la fonction,
-    // puis décimation. Le signal sec est retardé de 16 échantillons pour rester aligné avec le signal traité.
-    struct Os2
+    // Traitement non linéaire suréchantillonné K fois (K = 2 ou 4) : le signal est suréchantillonné (points intermédiaires en
+    // cubique, 4 points), passe dans la fonction, puis décimation. Le signal sec est retardé de 17 échantillons pour rester aligné.
+    template <int K>
+    struct OsK
     {
         Decim dec;
-        float pl = 0.0f, pr = 0.0f;
-        std::array<float, 16> dl {}, dr {};
+        float hl[3] {}, hr[3] {};                 // x[n-1], x[n-2], x[n-3]
+        std::array<float, 32> dl {}, dr {};
         int dp = 0;
+        float xp[2] {}, Fp[2] {};                 // état de l'antialiasing par primitive (ADAA), canaux G et D
+        bool adaaPrimed = false;
 
-        Os2() { dec.design (2); }
-        void reset() { dec.reset(); pl = pr = 0.0f; dl.fill (0.0f); dr.fill (0.0f); dp = 0; }
+        OsK() { dec.design (K); }
+        void reset() { dec.reset(); for (auto& v : hl) v = 0.0f; for (auto& v : hr) v = 0.0f; dl.fill (0.0f); dr.fill (0.0f); dp = 0; adaaPrimed = false; }
 
+        // Fonction sans mémoire
         template <class F>
         void run (float l, float r, bool active, F sh, float& wl, float& wr, float& dryL, float& dryR)
         {
-            dryL = dl[(size_t) dp];  dryR = dr[(size_t) dp];
-            dl[(size_t) dp] = l;     dr[(size_t) dp] = r;
-            dp = (dp + 1) & 15;
-            const float ml = 0.5f * (pl + l), mr = 0.5f * (pr + r);
-            pl = l; pr = r;
-            if (active)
+            core (l, r, active, [&] (float x, int) { return sh (x); }, wl, wr, dryL, dryR);
+        }
+
+        // Avec antialiasing par primitive : y = (F(x) - F(x1)) / (x - x1), F = primitive de la fonction f.
+        // Combiné avec le suréchantillonnage, le repliement des fonctions dures (écrêtage, repli, tanh) baisse nettement.
+        template <class F, class IF>
+        void runAdaa (float l, float r, bool active, F f, IF F1, float& wl, float& wr, float& dryL, float& dryR)
+        {
+            if (! active)
+                adaaPrimed = false;
+            else if (! adaaPrimed)
             {
-                dec.push (sh (ml), sh (mr));
-                dec.push (sh (l), sh (r));
-                dec.out (wl, wr);
+                xp[0] = xp[1] = 0.0f;
+                Fp[0] = Fp[1] = F1 (0.0f);
+                adaaPrimed = true;
             }
+            core (l, r, active, [&] (float x, int ch)
+            {
+                const float Fx = F1 (x);
+                const float dx = x - xp[ch];
+                const float y = std::fabs (dx) > 1.0e-2f ? (Fx - Fp[ch]) / dx : f (0.5f * (x + xp[ch]));
+                xp[ch] = x;  Fp[ch] = Fx;
+                return y;
+            }, wl, wr, dryL, dryR);
+        }
+
+    private:
+        template <class S>
+        void core (float l, float r, bool active, S shape, float& wl, float& wr, float& dryL, float& dryR)
+        {
+            dl[(size_t) dp] = l;  dr[(size_t) dp] = r;
+            dryL = dl[(size_t) ((dp - 17) & 31)];  dryR = dr[(size_t) ((dp - 17) & 31)];
+            dp = (dp + 1) & 31;
+
+            // points entre x[n-2] et x[n-1] (voisins : x[n-3], x[n-2], x[n-1], x[n]), puis x[n-1] lui-même
+            for (int j = 1; j <= K; ++j)
+            {
+                float a, b;
+                if (j < K)
+                {
+                    const float fr = (float) j / (float) K;
+                    a = ms::cubic4 (hl[2], hl[1], hl[0], l, fr);
+                    b = ms::cubic4 (hr[2], hr[1], hr[0], r, fr);
+                }
+                else
+                {
+                    a = hl[0];  b = hr[0];
+                }
+                if (active)
+                    dec.push (shape (a, 0), shape (b, 1));
+                else
+                    dec.push (a, b);
+            }
+            hl[2] = hl[1]; hl[1] = hl[0]; hl[0] = l;
+            hr[2] = hr[1]; hr[1] = hr[0]; hr[0] = r;
+
+            if (active)
+                dec.out (wl, wr);
             else
             {
-                dec.push (ml, mr);
-                dec.push (l, r);
                 wl = dryL; wr = dryR;
             }
         }
     };
+    using Os2 = OsK<2>;
+    using Os4 = OsK<4>;
+
+    // Résonateur modal (corde, barre, cloche, tube...), enveloppe de timbre, suivi du clavier, LFO aléatoires
+    ms::ModalBank modal;
+    float excEnv = 0.0f, excLp = 0.0f;
+    juce::uint32 excSeed = 2463534242u;
+    std::array<float, 6> rsPrev {};
+    bool modalDirty = true;
+    double modalF = 0.0;
+    float tbEnv = 1.0f, tbA = 1.0f;
+    float tbS1[2] {}, tbS2[2] {};
+    double baseFreqNow = 261.6;
+    float keyOct = 0.0f;                 // (note - 60) / 12
+    float keyGainNow = 1.0f;
+    double noteSamples = 0.0;
+    std::array<float, 4> rndCur {}, rndNext {};
 
     Decim oscDec;
     std::array<float, 16> oDlyL {}, oDlyR {};   // retard du signal des oscillateurs quand le suréchantillonnage est inutile
     int oDlyPos = 0;
     Os2 driveOs, distOs;
+    Os4 distOs4;                 // repli d'onde (FOLD) : spectre très large, suréchantillonné 4 fois
 };
 
 //==============================================================================
@@ -497,6 +587,12 @@ public:
     // Listes de la matrice de modulation
     static juce::StringArray warpModeNames();
     static juce::StringArray lfoSyncNames();
+    static juce::StringArray lfoShapeNames();
+    static double lfoBeatsPerCycle (int syncIndex) noexcept
+    {
+        static const double b[] = { 0.0, 16.0, 8.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.125 };
+        return b[juce::jlimit (0, 8, syncIndex)];
+    }
     static juce::StringArray modSourceNames();
     static juce::StringArray modTargetNames();
 
@@ -529,7 +625,7 @@ private:
     // Effets
     juce::dsp::Chorus<float> chorus;
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine;
-    juce::Reverb reverb;
+    ms::FdnReverb reverb;
     juce::dsp::Phaser<float> phaser;
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> preDelay { 48000 };
     juce::AudioBuffer<float> reverbBuf;

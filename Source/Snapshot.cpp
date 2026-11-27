@@ -19,20 +19,20 @@ int main()
         return 0;
     };
 
-    const Shot shots[] = { { "osc.png", find ("Reese Cathedrale"), 0 },
+    const Shot shots[] = { { "osc.png", find ("Reese Propre"), 0 },
                            { "fmringuni.png", find ("Cristal FM"), 24 },
                            { "bruitcorde.png", find ("Pluie Acide"), 25 },
-                           { "pitchjeu.png", find ("FM Griffe"), 26 },
-                           { "filtre.png", find ("Reese Cathedrale"), 7 },
+                           { "pitchjeu.png", find ("FM Boisee"), 26 },
+                           { "filtre.png", find ("Reese Propre"), 7 },
                            { "filtre2.png", find ("Souffle Nord"), 8 },
-                           { "envflt.png", find ("Acide Zinc"), 27 },
-                           { "lfo.png", find ("Wobble Sale"), 12 },
+                           { "envflt.png", find ("Acide Rond"), 27 },
+                           { "lfo.png", find ("Wobble Large"), 12 },
                            { "delay.png", find ("Echo Machine"), 18 },
                            { "rack.png", find ("Usine Lointaine"), 22 },
-                           { "matrice.png", find ("Reese Cathedrale"), 23 },
-                           { "eq.png", find ("Glace Noire"), 20 },
+                           { "matrice.png", find ("Reese Propre"), 23 },
+                           { "eq.png", find ("Cristal FM"), 20 },
                            { "dessin.png", find ("Lead Dessine"), 14 },
-                           { "master.png", find ("Reese Cathedrale"), 21 } };
+                           { "master.png", find ("Reese Propre"), 21 } };
 
     std::unique_ptr<juce::AudioProcessorEditor> base (proc.createEditor());
     auto* ed = dynamic_cast<MonSyntheEditor*> (base.get());

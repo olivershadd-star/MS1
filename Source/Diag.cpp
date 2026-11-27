@@ -115,6 +115,57 @@ float inharmonicDb (const std::vector<float>& x, double f0)
 }
 
 double hz (int note) { return 440.0 * std::pow (2.0, (note - 69) / 12.0); }
+
+// Init sans modulation (LFO de position et enveloppe de modulation coupes) : sert a mesurer le repliement sans bruit de modulation
+void initClean (MonSyntheProcessor& p)
+{
+    p.loadFactoryPreset (0);
+    setP (p, "lfoDepth", 0.0f);
+    setP (p, "modAmount", 0.0f);
+}
+
+// Une trame FFT centree sur le milieu de [t0, t1] (fenetre de Hann), puis mesure
+std::vector<float> frameSpectrum (const std::vector<float>& x, double t0, double t1, int order)
+{
+    const int N = 1 << order;
+    juce::dsp::FFT fft (order);
+    std::vector<float> fd (2 * (size_t) N, 0.0f);
+    const long mid = (long) (0.5 * (t0 + t1) * SR);
+    for (int i = 0; i < N; ++i)
+    {
+        const long idx = mid - N / 2 + i;
+        const float v = idx >= 0 && idx < (long) x.size() ? x[(size_t) idx] : 0.0f;
+        fd[(size_t) i] = v * (0.5f - 0.5f * std::cos (juce::MathConstants<float>::twoPi * (float) i / (float) N));
+    }
+    fft.performFrequencyOnlyForwardTransform (fd.data());
+    fd.resize ((size_t) N / 2);
+    return fd;
+}
+
+// Centre de gravite spectral (Hz) autour du milieu de [t0, t1]
+double centroidHz (const std::vector<float>& x, double t0, double t1)
+{
+    const int order = 13, N = 1 << order;
+    const auto sp = frameSpectrum (x, t0, t1, order);
+    double num = 0.0, den = 0.0;
+    for (int k = 2; k < N / 2; ++k)
+    {
+        const double f = (double) k * SR / N, e = (double) sp[(size_t) k] * sp[(size_t) k];
+        num += f * e;  den += e;
+    }
+    return den > 0.0 ? num / den : 0.0;
+}
+
+// Niveau (dB) d'une bande etroite autour de f (+/- 2,5 %) autour du milieu de [t0, t1]
+double bandLevelDb (const std::vector<float>& x, double f, double t0, double t1)
+{
+    const int order = 14, N = 1 << order;
+    const auto sp = frameSpectrum (x, t0, t1, order);
+    double e = 0.0;
+    for (int k = (int) (f * 0.975 / SR * N); k <= (int) (f * 1.025 / SR * N) + 1 && k < N / 2; ++k)
+        e += (double) sp[(size_t) k] * sp[(size_t) k];
+    return db (std::sqrt (e) / N);
+}
 }
 
 int main()
@@ -161,7 +212,7 @@ int main()
     std::printf ("\n== C. REPLIEMENT : energie hors harmoniques (dB, plus bas = plus propre), note C6, une voix\n");
     for (int t = 0; t < 8; ++t)
     {
-        proc.loadFactoryPreset (0);
+        initClean (proc);
         setP (proc, "tableA", (float) t); setP (proc, "position", 0.5f);
         setP (proc, "cutoff", 20000.0f); setP (proc, "unison", 1.0f);
         auto r = render (proc, { 84 }, 1.2, 0.1);
@@ -170,7 +221,7 @@ int main()
     for (auto [name, id, val] : std::vector<std::tuple<const char*, const char*, float>> {
              { "FM 0.5", "fmAmount", 0.5f }, { "RING 0.6", "ringAmount", 0.6f }, { "WARP A 0.6 (mode 3 sync)", "warpAmtA", 0.6f }, { "DISTO 0.7", "distAmt", 0.7f } })
     {
-        proc.loadFactoryPreset (0);
+        initClean (proc);
         setP (proc, "cutoff", 20000.0f); setP (proc, "unison", 1.0f); setP (proc, "oscBLevel", 0.6f);
         if (std::string (id) == "warpAmtA") setP (proc, "warpModeA", 3.0f);
         if (std::string (id) == "distAmt") { setP (proc, "distType", 1.0f); setP (proc, "distMix", 1.0f); }
@@ -185,7 +236,7 @@ int main()
         for (auto [name, id, val] : std::vector<std::tuple<const char*, const char*, float>> {
                  { "FM 0.5", "fmAmount", 0.5f }, { "WARP A 0.6", "warpAmtA", 0.6f }, { "DISTO 0.7", "distAmt", 0.7f } })
         {
-            proc.loadFactoryPreset (0);
+            initClean (proc);
             setP (proc, "quality", (float) q);
             setP (proc, "cutoff", 20000.0f); setP (proc, "unison", 1.0f); setP (proc, "oscBLevel", 0.6f);
             if (std::string (id) == "warpAmtA") setP (proc, "warpModeA", 3.0f);
@@ -194,7 +245,7 @@ int main()
             auto r = render (proc, { 72 }, 1.2, 0.1);
             std::printf ("qualite %d  %s : %.1f dB\n", q, name, inharmonicDb (r.m, hz (72)));
         }
-        proc.loadFactoryPreset (0);
+        initClean (proc);
         setP (proc, "quality", (float) q); setP (proc, "unison", 7.0f); setP (proc, "oscBLevel", 0.6f); setP (proc, "fmAmount", 0.3f);
         auto rc = render (proc, { 48, 52, 55, 59, 60, 64, 67, 71 }, 2.0, 0.5);
         std::printf ("qualite %d  CPU 8 notes, unison 7, osc B + FM : %.1f%%\n", q, rc.cpu * 100.0);
@@ -216,6 +267,141 @@ int main()
         for (size_t i = 0; i + 1 < sp.size(); ++i) step += bandDist (sp[i], sp[i + 1], true);
         std::printf ("table %2d %-12s : niveau %.1f..%.1f dB, variation totale %.1f dB, par pas %.1f dB\n", t,
                      WavetableBank::tableNames()[t].toRawUTF8(), lo, hi, tot, step / 5.0f);
+    }
+
+    // ------------------------------------------------------------------ C4. Registres
+    std::printf ("\n== C4. REGISTRES : residu non harmonique (dB, objectif < -55) / niveau (dB), selon la note, LFO coupe, une voix\n");
+    for (auto [name, tbl, pos] : std::vector<std::tuple<const char*, int, float>> { { "BASIQUE", 0, 0.5f }, { "SPECTRE (tres riche)", 3, 0.0f }, { "CLASSIQUE (AKWF)", 8, 0.5f }, { "SYNTH A (AKWF)", 22, 0.5f } })
+    {
+        std::printf ("%-22s :", name);
+        for (int n : { 24, 36, 48, 60, 72, 84, 96, 108 })
+        {
+            initClean (proc);
+            setP (proc, "tableA", (float) tbl); setP (proc, "position", pos); setP (proc, "cutoff", 20000.0f); setP (proc, "unison", 1.0f);
+            setP (proc, "sustain", 1.0f); setP (proc, "decay", 0.01f);
+            auto r = render (proc, { n }, 1.2, 0.1);
+            std::printf (" %d:%.0f/%.0f", n, inharmonicDb (r.m, hz (n)), db (rmsRange (r.m, 0.5, 1.1)));
+        }
+        std::printf ("\n");
+    }
+
+    std::printf ("\n== C5. ETAGES NON LINEAIRES et FM / WARP / RING : residu non harmonique (dB) a trois registres (C3, C5, C7)\n");
+    for (auto [name, id, val, extraId, extraVal] : std::vector<std::tuple<const char*, const char*, float, const char*, float>> {
+             { "DRIVE 0.6", "drive", 0.6f, "", 0.0f }, { "DRIVE 1.0", "drive", 1.0f, "", 0.0f },
+             { "DISTO type 0 x0.7", "distAmt", 0.7f, "distType", 0.0f }, { "DISTO type 1 x0.7", "distAmt", 0.7f, "distType", 1.0f },
+             { "DISTO type 2 x0.7", "distAmt", 0.7f, "distType", 2.0f }, { "FM 0.4", "fmAmount", 0.4f, "oscBLevel", 0.5f },
+             { "WARP SYNC 0.5", "warpAmtA", 0.5f, "warpModeA", 3.0f }, { "WARP MIRROR 0.7", "warpAmtA", 0.7f, "warpModeA", 4.0f },
+             { "RING 0.6", "ringAmount", 0.6f, "oscBLevel", 0.5f } })
+    {
+        std::printf ("%-20s :", name);
+        for (int n : { 48, 72, 96 })
+        {
+            initClean (proc);
+            setP (proc, "cutoff", 20000.0f); setP (proc, "unison", 1.0f); setP (proc, "sustain", 1.0f); setP (proc, "decay", 0.01f);
+            if (std::string (extraId).size()) setP (proc, extraId, extraVal);
+            if (std::string (id) == "distAmt") setP (proc, "distMix", 1.0f);
+            setP (proc, id, val);
+            auto r = render (proc, { n }, 1.2, 0.1);
+            std::printf (" %d:%.0f", n, inharmonicDb (r.m, hz (n)));
+        }
+        std::printf ("\n");
+    }
+
+    // ------------------------------------------------------------------ I. Signatures d'instruments (le moteur sait-il produire des sons naturels ?)
+    std::printf ("\n== I. SIGNATURES : le moteur sait-il produire des sons de famille instrumentale ? (mesures, note C3 = 130,8 Hz)\n");
+    auto bodyOnly = [&] (int mat, float decay, float damp, float pos, float burst, float bright, float stretch)
+    {
+        initClean (proc);
+        setP (proc, "oscALevel", 0.0f); setP (proc, "sustain", 1.0f); setP (proc, "decay", 0.01f); setP (proc, "attack", 0.001f); setP (proc, "release", 1.0f);
+        setP (proc, "cutoff", 20000.0f); setP (proc, "unison", 1.0f); setP (proc, "voiceGain", 6.0f);
+        setP (proc, "rsLevel", 0.9f); setP (proc, "rsMat", (float) mat); setP (proc, "rsDecay", decay); setP (proc, "rsDamp", damp);
+        setP (proc, "rsPos", pos); setP (proc, "rsBurst", burst); setP (proc, "rsBright", bright); setP (proc, "rsStretch", stretch);
+    };
+    {
+        // PINCE : les aigus s'eteignent plus vite, un creux regulier selon le point de pincage
+        bodyOnly (0, 3.0f, 0.7f, 0.2f, 1.5f, 0.8f, 0.0f);
+        auto r = render (proc, { 48 }, 3.0, 0.3);
+        const double f0 = hz (48);
+        std::printf ("PINCE (corde, pincement a 1/5) : centre de gravite %.0f Hz a 0,05-0,2 s  ->  %.0f Hz a 1,0-1,5 s ; niveau %.1f dB -> %.1f dB\n",
+                     centroidHz (r.m, 0.05, 0.2), centroidHz (r.m, 1.0, 1.5), db (rmsRange (r.m, 0.05, 0.2)), db (rmsRange (r.m, 1.0, 1.5)));
+        std::printf ("   fondamentale : %.1f dB (t=0,1 s) -> %.1f dB (t=1,5 s) ; harmonique 6 : %.1f dB -> %.1f dB (decroit plus vite = bien)\n",
+                     bandLevelDb (r.m, f0, 0.05, 0.3), bandLevelDb (r.m, f0, 1.4, 1.9), bandLevelDb (r.m, 6.0 * f0, 0.05, 0.3), bandLevelDb (r.m, 6.0 * f0, 1.4, 1.9));
+        std::printf ("   peigne du pincement (pos 0,2 : harmoniques 5 et 10 doivent etre tres bas) : h4 %.1f, h5 %.1f, h6 %.1f dB ; h9 %.1f, h10 %.1f, h11 %.1f dB\n",
+                     bandLevelDb (r.m, 4 * f0, 0.05, 0.3), bandLevelDb (r.m, 5 * f0, 0.05, 0.3), bandLevelDb (r.m, 6 * f0, 0.05, 0.3),
+                     bandLevelDb (r.m, 9 * f0, 0.05, 0.3), bandLevelDb (r.m, 10 * f0, 0.05, 0.3), bandLevelDb (r.m, 11 * f0, 0.05, 0.3));
+    }
+    {
+        // CLAVIER (piano) : inharmonicite croissante : l'harmonique 10 est au-dessus de 10 f0
+        bodyOnly (0, 4.0f, 0.55f, 0.12f, 4.0f, 0.45f, 0.35f);
+        auto r = render (proc, { 48 }, 3.0, 0.3);
+        const double f0 = hz (48);
+        // cherche le pic proche de 10 f0
+        double bestF = 0, bestL = -999;
+        for (double f = 9.8 * f0; f < 10.6 * f0; f += f0 / 400.0)
+        {
+            const double l = bandLevelDb (r.m, f, 0.1, 0.6);
+            if (l > bestL) { bestL = l; bestF = f; }
+        }
+        std::printf ("CLAVIER (corde raide, marteau mou) : le 10e partiel tombe a %.3f x f0 (piano reel : environ 10,0 a 10,2) ; centre de gravite %.0f -> %.0f Hz\n",
+                     bestF / f0, centroidHz (r.m, 0.05, 0.3), centroidHz (r.m, 1.5, 2.0));
+    }
+    {
+        // CLOCHE : partiels non harmoniques longs
+        bodyOnly (3, 6.0f, 0.2f, 0.3f, 1.0f, 0.9f, 0.0f);
+        auto r = render (proc, { 60 }, 3.0, 0.3);
+        const double f0 = hz (60);
+        std::printf ("CLOCHE : niveau (dB) aux rapports 0,5 / 1 / 1,19 / 1,5 / 2 / 2,51 / 3 / 4,17 de f0 :");
+        for (double q : { 0.5, 1.0, 1.183, 1.506, 2.0, 2.514, 3.011, 4.166 })
+            std::printf (" %.0f", bandLevelDb (r.m, q * f0, 0.1, 0.4));
+        std::printf (" ; a 2,5 s : %.0f dB (fondamentale)\n", bandLevelDb (r.m, f0, 2.0, 2.6));
+        const double k2 = bandLevelDb (r.m, 2.0 * f0, 0.1, 0.4), k3 = bandLevelDb (r.m, 3.0 * f0, 0.1, 0.4), kx = bandLevelDb (r.m, 2.514 * f0, 0.1, 0.4);
+        std::printf ("   harmonique pur 2f0 : %.0f dB, 3f0 : %.0f dB, partiel inharmonique 2,514 f0 : %.0f dB\n", k2, k3, kx);
+    }
+    {
+        // SOUFFLE / TUBE : bruit continu entre dans un tube (flute / clarinette) : harmoniques impairs dominants
+        bodyOnly (4, 0.3f, 0.2f, 0.45f, 1.0f, 0.5f, 0.0f);
+        setP (proc, "rsFeed", 1.0f); setP (proc, "rsDry", 0.0f); setP (proc, "noiseLevel", 0.8f); setP (proc, "noiseDecay", 5.0f); setP (proc, "noiseType", 0.0f); setP (proc, "noiseTone", 0.7f);
+        auto r = render (proc, { 55 }, 2.0, 0.3);
+        const double f0 = hz (55);
+        std::printf ("TUBE alimente par du bruit : niveau (dB) de h1..h6 :");
+        for (int k = 1; k <= 6; ++k) std::printf (" %.0f", bandLevelDb (r.m, k * f0, 0.5, 1.5));
+        std::printf (" (impairs plus forts que pairs = tube ferme)\n");
+    }
+    {
+        // TIMBRE EVOLUTIF sur un oscillateur : saw riche, les aigus tombent
+        initClean (proc);
+        setP (proc, "tableA", 0.0f); setP (proc, "position", 0.5f); setP (proc, "cutoff", 20000.0f); setP (proc, "unison", 1.0f);
+        setP (proc, "sustain", 1.0f); setP (proc, "decay", 0.01f);
+        setP (proc, "tbAmt", 1.0f); setP (proc, "tbDecay", 0.5f); setP (proc, "tbEnd", 2.0f); setP (proc, "tbVel", 0.0f);
+        auto r = render (proc, { 48 }, 3.0, 0.2);
+        std::printf ("TIMBRE EVOLUTIF (saw) : centre de gravite %.0f Hz a 0-0,1 s -> %.0f Hz a 0,4-0,6 s -> %.0f Hz a 2,0-2,5 s\n",
+                     centroidHz (r.m, 0.0, 0.12), centroidHz (r.m, 0.4, 0.6), centroidHz (r.m, 2.0, 2.5));
+    }
+    {
+        // SUIVI DU CLAVIER du filtre : le rapport centre de gravite / f0 doit rester constant
+        std::printf ("SUIVI CLAVIER (saw, coupure 800 Hz) : centroide / f0 aux notes 36, 48, 60, 72, 84 :");
+        for (float key : { 0.0f, 1.0f })
+        {
+            std::printf ("\n   suivi %.0f %% :", key * 100.0f);
+            for (int n : { 36, 48, 60, 72, 84 })
+            {
+                initClean (proc);
+                setP (proc, "tableA", 0.0f); setP (proc, "position", 0.5f); setP (proc, "cutoff", 800.0f); setP (proc, "filterType", 1.0f);
+                setP (proc, "unison", 1.0f); setP (proc, "sustain", 1.0f); setP (proc, "decay", 0.01f); setP (proc, "fltKey", key);
+                auto r = render (proc, { n }, 1.2, 0.1);
+                std::printf (" %.1f", centroidHz (r.m, 0.4, 1.1) / hz (n));
+            }
+        }
+        std::printf ("\n");
+    }
+    {
+        // REVERBE : queue apres le relachement
+        initClean (proc);
+        setP (proc, "reverbMix", 0.5f); setP (proc, "reverbSize", 0.5f); setP (proc, "reverbDamp", 0.4f);
+        setP (proc, "attack", 0.001f); setP (proc, "decay", 0.1f); setP (proc, "sustain", 0.0f); setP (proc, "release", 0.05f);
+        auto r = render (proc, { 60 }, 0.3, 5.0);
+        std::printf ("REVERBE (taille 0,5) : niveau de la queue : %.1f dB a +0,3 s, %.1f dB a +1,3 s, %.1f dB a +3,3 s (apres la note)\n",
+                     db (rmsRange (r.m, 0.6, 0.8)), db (rmsRange (r.m, 1.6, 1.8)), db (rmsRange (r.m, 3.6, 3.8)));
     }
 
     // ------------------------------------------------------------------ D. Sensibilite des potards
@@ -284,11 +470,12 @@ int main()
 
     // ------------------------------------------------------------------ E. Presets : attaque de note, craquements, disparition, CPU, variete
     std::printf ("\n== E. PRESETS (note C3 tenue 2 s, vel 0.8)\n");
-    std::printf ("IDX|NOM|CAT|TAC dB|CRAQ/s|FIN-MAX dB|CPU %%\n");
+    std::printf ("IDX|NOM|CAT|TAC dB|CRAQ/s|FIN-MAX dB|NIV dB|CPU %%\n");
     std::vector<std::vector<float>> fp;
     std::vector<juce::String> names;
     std::vector<double> cpus;
     int nTac = 0, nCrack = 0, nGone = 0;
+    setP (proc, "quality", 1.0f);                                      // NORMAL : le reglage par defaut du plugin (les sections precedentes l ont modifie)
     for (int p = 0; p < nPresets; ++p)
     {
         proc.loadFactoryPreset (p);
@@ -332,14 +519,19 @@ int main()
         float maxW = -200.0f;
         for (double t = 0.0; t < 1.8; t += 0.2) maxW = juce::jmax (maxW, db (rmsRange (x, t, t + 0.2)));
         const float endW = db (rmsRange (x, 1.7, 2.0));
+        float nivW = -200.0f;                                           // niveau : fenetre courte (100 ms) pour ne pas rater les attaques pincees
+        for (double t = 0.0; t < 1.8; t += 0.05) nivW = juce::jmax (nivW, db (rmsRange (x, t, t + 0.1)));
 
         cpus.push_back (r.cpu);
+        const auto catName = MonSyntheProcessor::getFactoryPresetCategory (p);
+        const bool decaying = catName == "CORDES" || catName == "PERCUS" || MonSyntheProcessor::getFactoryPresetName (p).containsAnyOf ("Pluck")
+                              || MonSyntheProcessor::getFactoryPresetName (p) == "Corde Basse" || MonSyntheProcessor::getFactoryPresetName (p) == "Echo Machine";
         const char* flag = "";
-        if (worst > 14.0f) { ++nTac; flag = " TAC"; }
+        if (worst > 14.0f && ! decaying) { ++nTac; flag = " TAC"; }
         if (spikes > 20)   { ++nCrack; flag = " CRAQ"; }
-        if (endW - maxW < -25.0f) { ++nGone; flag = " DISPARAIT"; }
-        std::printf ("%d|%s|%s|%.1f|%d|%.1f|%.1f%s\n", p, MonSyntheProcessor::getFactoryPresetName (p).toRawUTF8(),
-                     MonSyntheProcessor::getFactoryPresetCategory (p).toRawUTF8(), worst, spikes, endW - maxW, r.cpu * 100.0, flag);
+        if (endW - maxW < -25.0f && ! decaying) { ++nGone; flag = " DISPARAIT"; }
+        std::printf ("%d|%s|%s|%.1f|%d|%.1f|%.1f|%.1f%s\n", p, MonSyntheProcessor::getFactoryPresetName (p).toRawUTF8(),
+                     catName.toRawUTF8(), worst, spikes, endW - maxW, nivW, r.cpu * 100.0, flag);
 
         fp.push_back (bands (x, 0.3, 1.9));
         names.push_back (MonSyntheProcessor::getFactoryPresetName (p));
