@@ -32,7 +32,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "filterType", 1.0f }, { "cutoff", 520.0f }, { "resonance", 0.7f }, { "attack", 0.004f },
             { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.15f }, { "distType", 2.0f }, { "distAmt", 0.0f },
             { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 1.0f },
-            { "mx2Amt", 0.5f }, { "mx3Src", 11.0f }, { "mx3Dst", 18.0f }, { "mx3Amt", 0.7f } } },
+            { "mx2Amt", 0.5f }, { "mx3Src", 11.0f }, { "mx3Dst", 18.0f }, { "mx3Amt", 0.7f }, { "voiceGain", -2.5f } } },
 
         { "Reese Cathedrale", "BASSES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 1.0f }, { "glide", 0.05f }, { "tableA", 19.0f },
@@ -44,7 +44,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "lfo3Rate", 0.12f }, { "lfo3Shape", 1.0f }, { "mx1Src", 14.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.28f },
             { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.55f }, { "mx3Src", 10.0f }, { "mx3Dst", 2.0f },
             { "mx3Amt", 0.6f }, { "mx4Src", 11.0f }, { "mx4Dst", 18.0f }, { "mx4Amt", 0.5f }, { "mx5Src", 12.0f },
-            { "mx5Dst", 6.0f }, { "mx5Amt", 0.7f } } },
+            { "mx5Dst", 6.0f }, { "mx5Amt", 0.7f }, { "voiceGain", -1.8f } } },
 
         { "Acide Zinc", "BASSES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 1.0f }, { "unison", 1.0f }, { "spread", 0.0f },
@@ -63,7 +63,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "lfoShape", 1.0f }, { "lfoSync", 6.0f }, { "attack", 0.003f }, { "decay", 0.2f }, { "sustain", 1.0f },
             { "release", 0.15f }, { "mx1Src", 1.0f }, { "mx1Dst", 16.0f }, { "mx1Amt", 0.3f }, { "mx2Src", 9.0f },
             { "mx2Dst", 3.0f }, { "mx2Amt", 0.45f }, { "mx3Src", 10.0f }, { "mx3Dst", 16.0f }, { "mx3Amt", 0.5f },
-            { "mx4Src", 11.0f }, { "mx4Dst", 18.0f }, { "mx4Amt", 0.5f } } },
+            { "mx4Src", 11.0f }, { "mx4Dst", 18.0f }, { "mx4Amt", 0.5f }, { "voiceGain", -2.5f } } },
 
         { "Wobble Sale", "BASSES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 1.0f }, { "glide", 0.03f }, { "tableA", 22.0f },
@@ -73,7 +73,8 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "sustain", 1.0f }, { "release", 0.12f }, { "mx1Src", 1.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.55f },
             { "mx2Src", 1.0f }, { "mx2Dst", 4.0f }, { "mx2Amt", 0.2f }, { "mx3Src", 9.0f }, { "mx3Dst", 3.0f },
             { "mx3Amt", 0.4f }, { "mx4Src", 10.0f }, { "mx4Dst", 1.0f }, { "mx4Amt", 0.5f }, { "mx5Src", 11.0f },
-            { "mx5Dst", 18.0f }, { "mx5Amt", 0.5f }, { "mx6Src", 12.0f }, { "mx6Dst", 6.0f }, { "mx6Amt", 0.5f } } },
+            { "mx5Dst", 18.0f }, { "mx5Amt", 0.5f }, { "mx6Src", 12.0f }, { "mx6Dst", 6.0f }, { "mx6Amt", 0.5f },
+            { "voiceGain", -3.6f } } },
 
         { "Gate Machine", "BASSES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 1.0f }, { "unison", 1.0f }, { "spread", 0.0f },
@@ -82,7 +83,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "distAmt", 0.25f }, { "lfoShape", 3.0f }, { "lfoSync", 7.0f }, { "attack", 0.002f }, { "decay", 0.2f },
             { "sustain", 1.0f }, { "release", 0.04f }, { "mx1Src", 1.0f }, { "mx1Dst", 9.0f }, { "mx1Amt", 0.5f },
             { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 10.0f }, { "mx3Dst", 1.0f },
-            { "mx3Amt", 0.5f }, { "mx4Src", 11.0f }, { "mx4Dst", 18.0f }, { "mx4Amt", 0.5f } } },
+            { "mx3Amt", 0.5f }, { "mx4Src", 11.0f }, { "mx4Dst", 18.0f }, { "mx4Amt", 0.5f }, { "voiceGain", -1.8f } } },
 
         { "Ring Metal Bas", "BASSES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 1.0f }, { "unison", 1.0f }, { "spread", 0.0f },
@@ -109,7 +110,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "resonance", 1.5f }, { "noiseLevel", 0.08f }, { "noiseType", 2.0f }, { "noiseTone", 0.3f },
             { "noiseDecay", 4.0f }, { "attack", 0.003f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.12f },
             { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 1.0f },
-            { "mx2Amt", 0.5f }, { "mx3Src", 11.0f }, { "mx3Dst", 18.0f }, { "mx3Amt", 0.4f } } },
+            { "mx2Amt", 0.5f }, { "mx3Src", 11.0f }, { "mx3Dst", 18.0f }, { "mx3Amt", 0.4f }, { "voiceGain", -4.9f } } },
 
         { "Pompe Sidechain", "BASSES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 1.0f }, { "unison", 1.0f }, { "spread", 0.0f },
@@ -158,7 +159,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "fx1Type", 8.0f }, { "fx1On", 1.0f }, { "fx1Mix", 0.3f }, { "fx1A", 0.75f }, { "fx1B", 0.4f },
             { "fx1C", 0.5f }, { "fx1D", 0.6f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f },
             { "mx2Src", 10.0f }, { "mx2Dst", 1.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 11.0f }, { "mx3Dst", 18.0f },
-            { "mx3Amt", 0.4f }, { "mx4Src", 12.0f }, { "mx4Dst", 6.0f }, { "mx4Amt", 0.6f } } },
+            { "mx3Amt", 0.4f }, { "mx4Src", 12.0f }, { "mx4Dst", 6.0f }, { "mx4Amt", 0.6f }, { "voiceGain", 4.0f } } },
 
         { "Souffle Nord", "NAPPES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 14.0f }, { "position", 0.3f },
@@ -169,7 +170,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "f2Mode", 0.0f }, { "lfo3Rate", 0.08f }, { "lfo3Shape", 0.0f }, { "mx1Src", 14.0f }, { "mx1Dst", 22.0f },
             { "mx1Amt", 0.8f }, { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.45f }, { "mx3Src", 10.0f },
             { "mx3Dst", 22.0f }, { "mx3Amt", 0.5f }, { "mx4Src", 11.0f }, { "mx4Dst", 18.0f }, { "mx4Amt", 0.4f },
-            { "mx5Src", 12.0f }, { "mx5Dst", 6.0f }, { "mx5Amt", 0.6f } } },
+            { "mx5Src", 12.0f }, { "mx5Dst", 6.0f }, { "mx5Amt", 0.6f }, { "voiceGain", -2.0f } } },
 
         { "Rouille Lente", "NAPPES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 22.0f }, { "position", 0.3f }, { "unison", 7.0f },
@@ -251,7 +252,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "f2Vowel", 0.0f }, { "f2Mode", 0.0f }, { "lfo3Rate", 0.9f }, { "lfo3Shape", 1.0f }, { "mx1Src", 14.0f },
             { "mx1Dst", 22.0f }, { "mx1Amt", 0.4f }, { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.4f },
             { "mx3Src", 10.0f }, { "mx3Dst", 22.0f }, { "mx3Amt", 0.7f }, { "mx4Src", 11.0f }, { "mx4Dst", 18.0f },
-            { "mx4Amt", 0.4f } } },
+            { "mx4Amt", 0.4f }, { "voiceGain", -2.0f } } },
 
         { "Fer Chaud", "LEADS", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 1.0f }, { "glide", 0.03f }, { "tableA", 16.0f },
@@ -260,7 +261,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "attack", 0.004f }, { "decay", 0.3f }, { "sustain", 0.9f }, { "release", 0.2f }, { "reverbMix", 0.15f },
             { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 1.0f },
             { "mx2Amt", 0.5f }, { "mx3Src", 11.0f }, { "mx3Dst", 18.0f }, { "mx3Amt", 0.5f }, { "mx4Src", 12.0f },
-            { "mx4Dst", 6.0f }, { "mx4Amt", 0.5f } } },
+            { "mx4Dst", 6.0f }, { "mx4Amt", 0.5f }, { "voiceGain", -2.5f } } },
 
         { "Cristal FM", "LEADS", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 10.0f }, { "position", 0.6f }, { "tableB", 8.0f },
@@ -301,7 +302,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "delayLP", 5500.0f }, { "reverbMix", 0.3f }, { "reverbSize", 0.7f }, { "mx1Src", 9.0f },
             { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 1.0f }, { "mx2Amt", 0.5f },
             { "mx3Src", 11.0f }, { "mx3Dst", 18.0f }, { "mx3Amt", 0.4f }, { "mx4Src", 12.0f }, { "mx4Dst", 6.0f },
-            { "mx4Amt", 0.4f } } },
+            { "mx4Amt", 0.4f }, { "voiceGain", 8.0f } } },
 
         { "Corde Indus", "LEADS", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 20.0f }, { "position", 0.5f }, { "unison", 1.0f },
@@ -334,7 +335,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "draw2", 0.8f }, { "draw3", -0.4f }, { "draw4", 1.0f }, { "draw5", -0.9f }, { "draw6", 0.2f },
             { "draw7", 0.6f }, { "draw8", -0.7f }, { "mx1Src", 16.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.7f },
             { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 10.0f }, { "mx3Dst", 1.0f },
-            { "mx3Amt", 0.5f }, { "mx4Src", 11.0f }, { "mx4Dst", 18.0f }, { "mx4Amt", 0.4f } } },
+            { "mx3Amt", 0.5f }, { "mx4Src", 11.0f }, { "mx4Dst", 18.0f }, { "mx4Amt", 0.4f }, { "voiceGain", 9.0f } } },
 
         { "Usine Lointaine", "TEXTURES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 16.0f }, { "position", 0.6f },
@@ -353,7 +354,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "decay", 0.5f }, { "sustain", 1.0f }, { "release", 3.0f }, { "reverbMix", 0.5f }, { "reverbSize", 0.9f },
             { "lfoShape", 0.0f }, { "lfoSync", 2.0f }, { "mx1Src", 1.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.7f },
             { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 10.0f }, { "mx3Dst", 1.0f },
-            { "mx3Amt", 0.5f }, { "mx4Src", 11.0f }, { "mx4Dst", 19.0f }, { "mx4Amt", 0.4f } } },
+            { "mx3Amt", 0.5f }, { "mx4Src", 11.0f }, { "mx4Dst", 19.0f }, { "mx4Amt", 0.4f }, { "voiceGain", 3.0f } } },
 
         { "Grain Eclat", "TEXTURES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 15.0f }, { "position", 0.5f },
@@ -363,7 +364,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "reverbMix", 0.4f }, { "mx1Src", 7.0f }, { "mx1Dst", 1.0f }, { "mx1Amt", 0.9f }, { "mx2Src", 7.0f },
             { "mx2Dst", 3.0f }, { "mx2Amt", 0.4f }, { "mx3Src", 9.0f }, { "mx3Dst", 3.0f }, { "mx3Amt", 0.5f },
             { "mx4Src", 10.0f }, { "mx4Dst", 1.0f }, { "mx4Amt", 0.6f }, { "mx5Src", 11.0f }, { "mx5Dst", 18.0f },
-            { "mx5Amt", 0.4f } } },
+            { "mx5Amt", 0.4f }, { "voiceGain", 2.0f } } },
 
         { "Bourdon Metallique", "TEXTURES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 10.0f }, { "position", 0.3f },
@@ -390,7 +391,8 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "reverbSize", 0.95f }, { "fx1Type", 8.0f }, { "fx1On", 1.0f }, { "fx1Mix", 0.4f }, { "fx1A", 0.75f },
             { "fx1B", 0.6f }, { "fx1C", 0.5f }, { "fx1D", 0.5f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f },
             { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 1.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 11.0f },
-            { "mx3Dst", 18.0f }, { "mx3Amt", 0.3f }, { "mx4Src", 12.0f }, { "mx4Dst", 6.0f }, { "mx4Amt", 0.6f } } },
+            { "mx3Dst", 18.0f }, { "mx3Amt", 0.3f }, { "mx4Src", 12.0f }, { "mx4Dst", 6.0f }, { "mx4Amt", 0.6f },
+            { "voiceGain", 3.0f } } },
 
         { "Sirene Lente", "TEXTURES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 8.0f }, { "position", 0.3f }, { "unison", 3.0f },
@@ -399,7 +401,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "reverbMix", 0.45f }, { "reverbSize", 0.9f }, { "mx1Src", 1.0f }, { "mx1Dst", 5.0f },
             { "mx1Amt", 0.12f }, { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.5f }, { "mx3Src", 10.0f },
             { "mx3Dst", 1.0f }, { "mx3Amt", 0.5f }, { "mx4Src", 11.0f }, { "mx4Dst", 18.0f }, { "mx4Amt", 0.4f },
-            { "mx5Src", 12.0f }, { "mx5Dst", 6.0f }, { "mx5Amt", 0.5f } } },
+            { "mx5Src", 12.0f }, { "mx5Dst", 6.0f }, { "mx5Amt", 0.5f }, { "voiceGain", -2.5f } } },
 
         { "Cables", "TEXTURES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 20.0f }, { "position", 0.8f },
