@@ -252,6 +252,36 @@ int main()
         std::printf ("%-34s : spectre %.1f dB, niveau %+.1f dB\n", k.label, bandDist (spec[0], spec[1], false), db (lev[1]) - db (lev[0]));
     }
 
+    // ------------------------------------------------------------------ D2. Reponse par tranches de 10 % de course du potard
+    std::printf("\n== D2. COURBES : changement de spectre (dB) a chaque pas de 10 %% de course ; une courbe reguliere = pas proches\n");
+    for (const auto& k : knobs)
+    {
+        const std::string id (k.id);
+        if (id != "warpAmtA" && id != "fmAmount" && id != "ringAmount" && id != "drive" && id != "distAmt"
+            && id != "resonance" && id != "detune" && id != "position" && id != "cutoff")
+            continue;
+        std::vector<std::vector<float>> sp;
+        for (int s = 0; s <= 10; ++s)
+        {
+            proc.loadFactoryPreset (0);
+            setP (proc, "oscBLevel", 0.6f); setP (proc, "oscBPos", 0.4f); setP (proc, "position", 0.4f);
+            setP (proc, "cutoff", 6000.0f); setP (proc, "unison", 1.0f);
+            if (id == "detune") setP (proc, "unison", 5.0f);
+            if (id == "resonance") setP (proc, "cutoff", 1500.0f);
+            if (id == "warpAmtA") { setP (proc, "warpModeA", 3.0f); }
+            if (id == "distAmt") { setP (proc, "distType", 1.0f); setP (proc, "distMix", 1.0f); }
+            if (id == "fmAmount" || id == "ringAmount") setP (proc, "oscBLevel", 0.3f);
+            if (auto* pr = proc.apvts.getParameter (k.id))
+                setP (proc, k.id, pr->convertFrom0to1 ((float) s / 10.0f));
+            auto r = render (proc, { 55 }, 1.6, 0.2);
+            sp.push_back (bands (r.m, 0.4, 1.5));
+        }
+        std::printf ("%-12s :", k.id);
+        for (int s = 1; s <= 10; ++s)
+            std::printf (" %4.1f", bandDist (sp[(size_t) s - 1], sp[(size_t) s], false));
+        std::printf ("\n");
+    }
+
     // ------------------------------------------------------------------ E. Presets : attaque de note, craquements, disparition, CPU, variete
     std::printf ("\n== E. PRESETS (note C3 tenue 2 s, vel 0.8)\n");
     std::printf ("IDX|NOM|CAT|TAC dB|CRAQ/s|FIN-MAX dB|CPU %%\n");
