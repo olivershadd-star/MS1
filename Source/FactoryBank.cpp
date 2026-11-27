@@ -107,8 +107,8 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 1.0f }, { "unison", 1.0f }, { "spread", 0.0f },
             { "glide", 0.03f }, { "tableA", 16.0f }, { "position", 0.5f }, { "subLevel", 0.5f }, { "drive", 0.1f },
             { "distType", 1.0f }, { "distAmt", 0.3f }, { "filterType", 1.0f }, { "cutoff", 700.0f },
-            { "resonance", 1.5f }, { "noiseLevel", 0.08f }, { "noiseType", 2.0f }, { "noiseTone", 0.3f },
-            { "noiseDecay", 4.0f }, { "attack", 0.003f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.12f },
+            { "resonance", 1.5f }, { "noiseLevel", 0.05f }, { "noiseType", 1.0f }, { "noiseTone", 0.3f },
+            { "noiseDecay", 0.4f }, { "attack", 0.003f }, { "decay", 0.2f }, { "sustain", 1.0f }, { "release", 0.12f },
             { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx2Src", 10.0f }, { "mx2Dst", 1.0f },
             { "mx2Amt", 0.5f }, { "mx3Src", 11.0f }, { "mx3Dst", 18.0f }, { "mx3Amt", 0.4f }, { "voiceGain", -8.9f } } },
 
