@@ -339,12 +339,15 @@ private:
     struct NamedCombo { juce::ComboBox box; std::unique_ptr<APVTS::ComboBoxAttachment> att; };
 
     // L'interface est dessinée pour 1280 x 720 puis mise à l'échelle (fenêtre redimensionnable, 16:9)
-    static constexpr int baseWidth = 1280, baseHeight = 720;
-    static constexpr int numMenus = 24, matrixMenu = 23;
+    static constexpr int baseWidth = 1280, baseHeight = 660;
+    static constexpr int numMenus = 28, matrixMenu = 23;
     enum MenuId { mOscA = 0, mOscB, mFmRing, mUnison, mNoise, mString, mPitch, mFilter, mFilter2, mDisto, mEnvAmp, mEnvMod,
-                  mLfo, mLfo34, mDraw, mJeu, mChorus, mPhaser, mDelay, mReverb, mEq, mMaster, mRack, mMatrix };
+                  mLfo, mLfo34, mDraw, mJeu, mChorus, mPhaser, mDelay, mReverb, mEq, mMaster, mRack, mMatrix,
+                  mFmRingUni, mNoiseStr, mPitchJeu, mEnvFlt };      // pages fusionnées (ajoutées à la fin)
 
     static const MenuDef& menuAt (int index);
+    struct FamilyDef { const char* name; int role; int numTabs; int tabs[8]; };
+    static const FamilyDef& familyAt (int index);
 
     int S (float v) const noexcept { return juce::roundToInt (v * scale); }
     float pv (const char* id) const;
@@ -427,8 +430,21 @@ private:
     std::unique_ptr<APVTS::ButtonAttachment> monoAttachment;
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> captions;
 
-    // Menus
+    // Menus : 28 pages (cachées) regroupées en 10 familles (boutons de gauche) et jusqu'à 8 onglets au-dessus des écrans
     std::array<LedButton, numMenus> menuButtons;
+    std::array<LedButton, 10> famButtons;
+    std::array<LedButton, 8> tabButtons;
+    int currentFamily = 0, currentTab = 0;
+    std::array<int, 10> lastTab {};
+    int originX = 0;
+    juce::TextButton maschineButton { "MASCHINE" };
+    int lastFamilyLearn = -1;
+    void selectFamily (int family);
+    void selectTab (int tab);
+    void updateNavButtons();
+    void applyKnobText (Knob&);
+    void pushPageToProcessor();
+    void handleMidiNavigation();
 
     // Séquenceur
     juce::TextButton seqButton;

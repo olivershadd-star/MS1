@@ -1591,6 +1591,7 @@ MonSyntheProcessor::MonSyntheProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "PARAMS", createLayout())
 {
+    for (auto& a : familyCc) a.store (-1);
     ccExpect.fill (-1.0f);
     ccLastRaw.fill (-1.0f);
     for (auto& v : scopeRing)
@@ -1718,12 +1719,71 @@ void MonSyntheProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 
     synth.setMono (param ("mono") > 0.5f);
     // MIDI learn / correspondances CC -> réglage
+    if (const int g = pageGen.load(); g != lastPageGen)
+    {
+        lastPageGen = g;                                  // changement de page : les potards physiques doivent re-rejoindre la valeur
+        for (int k = 70; k <= 77; ++k)
+            ccExpect[(size_t) k] = -1.0f;
+    }
+
+    auto applyKnob = [this] (juce::RangedAudioParameter* p, int cc, float raw)
+    {
+        const float cur = p->getValue();
+        auto& expect = ccExpect[(size_t) cc];
+        auto& last = ccLastRaw[(size_t) cc];
+
+        if (ccFineHeld && last >= 0.0f)
+        {
+            // mode fin : le mouvement du potard est divisé par 10 (réglage au pourcent près, voire en dessous)
+            p->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, cur + (raw - last) * 0.1f));
+            expect = p->getValue();
+            lastMovedParam.store (p);
+        }
+        else
+        {
+            // mode reprise : si le réglage a changé ailleurs (preset, souris, autre page), le potard n'agit qu'après avoir rejoint la valeur
+            const bool known = expect >= 0.0f && std::abs (cur - expect) < 0.004f;
+            const bool crossed = last >= 0.0f && (last - cur) * (raw - cur) <= 0.0f;
+            if (known || std::abs (raw - cur) < 0.03f || crossed)
+            {
+                p->setValueNotifyingHost (raw);
+                expect = raw;
+                lastMovedParam.store (p);
+            }
+        }
+        last = raw;
+    };
+
+    auto builtinParam = [this] (int cc) -> juce::RangedAudioParameter*
+    {
+        static const char* const ids[8] = { "macro1", "macro2", "macro3", "macro4", "master", "cutoff", "resonance", "fltEnvAmount" };
+        if (cc >= 70 && cc <= 77)
+            return pageKnob[(size_t) (cc - 70)].load();
+        if (cc >= 108 && cc <= 115)
+            return dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (ids[cc - 108]));
+        return nullptr;
+    };
+
     for (const auto meta : midi)
     {
         const auto m = meta.getMessage();
         if (! m.isController() || m.getControllerNumber() >= 120)
             continue;
         const int cc = m.getControllerNumber();
+        if (const int fl = familyLearn.load(); fl >= 0 && fl < 10 && ! learnParam.load())
+        {
+            bool used = false;
+            for (auto& a : familyCc)
+                if (a.load() == cc)
+                    used = true;
+            if (! used)                                    // un bouton envoie 127 puis 0 : on ne retient que le premier message
+            {
+                familyCc[(size_t) fl].store (cc);
+                familyLearn.store (fl + 1);
+                triggerAsyncUpdate();
+            }
+            continue;
+        }
         if (cc == 64 && ! learnParam.load())
         {
             ccFineHeld = m.getControllerValue() >= 64;
@@ -1740,32 +1800,29 @@ void MonSyntheProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
             triggerAsyncUpdate();
         }
         else if (auto* p = ccParam[(size_t) cc].load())
+            applyKnob (p, cc, (float) m.getControllerValue() / 127.0f);
+        else if (auto* bp = builtinParam (cc))
+            applyKnob (bp, cc, (float) m.getControllerValue() / 127.0f);
+        else
         {
-            const float raw = (float) m.getControllerValue() / 127.0f;
-            const float cur = p->getValue();
-            auto& expect = ccExpect[(size_t) cc];
-            auto& last = ccLastRaw[(size_t) cc];
+            const int v = m.getControllerValue();
+            int fam = -1;
+            for (int f = 0; f < 10; ++f)
+                if (familyCc[(size_t) f].load() == cc)
+                    fam = f;
 
-            if (ccFineHeld && last >= 0.0f)
+            if (fam >= 0)                  navFamily.store (fam);                 // boutons de gauche : on réagit à 0 comme à 127
+            else if (cc >= 22 && cc <= 25) navTab.store (cc - 22);
+            else if (cc >= 26 && cc <= 29) navTab.store (4 + cc - 26);
+            else if (cc == 62)             ccFineHeld = v >= 64;                  // maintenu : potards MIDI 10 fois plus fins
+            else if (v >= 64)
             {
-                // mode fin : le mouvement du potard est divisé par 10 (réglage au pourcent près, voire en dessous)
-                p->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, cur + (raw - last) * 0.1f));
-                expect = p->getValue();
-                lastMovedParam.store (p);
+                if (cc == 60)      navAction.store (1);                            // preset précédent
+                else if (cc == 61) navAction.store (2);                            // preset suivant
+                else if (cc == 63) navAction.store (3);                            // mutation douce
+                else if (cc == 66) navAction.store (4);                            // mutation forte (aléatoire)
+                else if (cc == 67) synth.allNotesOff (0, false);                   // panique
             }
-            else
-            {
-                // mode reprise : si le réglage a changé ailleurs (preset, souris), le potard n'agit qu'après avoir rejoint la valeur
-                const bool known = expect >= 0.0f && std::abs (cur - expect) < 0.004f;
-                const bool crossed = last >= 0.0f && (last - cur) * (raw - cur) <= 0.0f;
-                if (known || std::abs (raw - cur) < 0.03f || crossed)
-                {
-                    p->setValueNotifyingHost (raw);
-                    expect = raw;
-                    lastMovedParam.store (p);
-                }
-            }
-            last = raw;
         }
     }
 
@@ -2759,6 +2816,9 @@ void MonSyntheProcessor::saveMidiMap()
         if (auto* p = ccParam[(size_t) cc].load())
             text << cc << "=" << p->paramID << "\n";
     const auto f = midiMapFile();
+    for (int k = 0; k < 10; ++k)
+        if (familyCc[(size_t) k].load() >= 0)
+            text << familyCc[(size_t) k].load() << "=@FAM" << k << "\n";
     f.getParentDirectory().createDirectory();
     f.replaceWithText (text);
 }
@@ -2775,6 +2835,13 @@ void MonSyntheProcessor::loadMidiMap()
         if (eq < 1)
             continue;
         const int cc = line.substring (0, eq).getIntValue();
+        if (line.substring (eq + 1).startsWith ("@FAM"))
+        {
+            const int k = line.substring (eq + 5).getIntValue();
+            if (k >= 0 && k < 10)
+                familyCc[(size_t) k].store (cc);
+            continue;
+        }
         if (auto* p = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (line.substring (eq + 1).trim())))
             if (cc >= 0 && cc < 128)
                 ccParam[(size_t) cc].store (p);

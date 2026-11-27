@@ -565,6 +565,17 @@ public:
     bool isMidiLearning() const noexcept { return learnParam.load() != nullptr; }
     int getCcForParam (const juce::String& paramId) const;
     void forgetCcForParam (const juce::String& paramId);
+    // --- Maschine+ (mode contrôleur) : potards CC 70-77 = les 8 potards de la page affichée, CC 108-115 = macros et pupitre,
+    //     boutons CC 22-29 = onglets, CC 60-69 = actions ; les 10 boutons de gauche sont appris avec l'assistant
+    void setPageKnob (int i, juce::RangedAudioParameter* p) noexcept
+    {
+        if (i >= 0 && i < 8) { pageKnob[(size_t) i].store (p); pageGen.fetch_add (1); }
+    }
+    void startFamilyLearn() noexcept  { familyLearn.store (0); }
+    void cancelFamilyLearn() noexcept { familyLearn.store (-1); }
+    int  familyLearnIndex() const noexcept { return familyLearn.load(); }      // -1 inactif, 0..9 en cours, 10 terminé
+    std::atomic<int> navFamily { -1 }, navTab { -1 }, navAction { 0 };         // demandes lues par l'éditeur
+    std::array<std::atomic<int>, 10> familyCc;
     juce::RangedAudioParameter* takeMovedParam() noexcept { return lastMovedParam.exchange (nullptr); }   // dernier réglage bougé au MIDI
     bool isMidiFine() const noexcept { return ccFineHeld; }
     int takeLearnedCc() noexcept { return lastLearnedCc.exchange (-1); }       // numéro de CC qui vient d'être appris, ou -1
@@ -581,6 +592,9 @@ private:
     std::array<float, 128> ccLastRaw {};       // dernière valeur brute reçue (mode fin)
     bool ccFineHeld = false;                   // pédale CC 64 enfoncée : les potards MIDI deviennent 10x plus fins
     std::atomic<juce::RangedAudioParameter*> lastMovedParam { nullptr };
+    std::array<std::atomic<juce::RangedAudioParameter*>, 8> pageKnob {};
+    std::atomic<int> pageGen { 0 }, familyLearn { -1 };
+    int lastPageGen = 0;
     juce::String lastLearnedName;
     bool midiMapLoaded = false;
 

@@ -502,9 +502,127 @@ const MonSyntheEditor::MenuDef& MonSyntheEditor::menuAt (int index)
                                                     { "compMakeup", "MAKEUP" }, { "compMix", "MIX" },
                                                     { "limCeil", "LIMITEUR" }, { "width", "LARGEUR" } } },
         { "RACK FX",   2, VizNone, VizNone,       {} },
-        { "MATRICE",   4, VizMatrix, VizMatrix,   {} }
+        { "MATRICE",   4, VizMatrix, VizMatrix,   {} },
+        { "FM/RING/UNI", 2, VizFmRing, VizUnison, { { "fmAmount", "FM" }, { "ringAmount", "RING" },
+                                                    { "oscBLevel", "NIVEAU B" }, { "subLevel", "SUB" },
+                                                    { "unison", "VOIX" }, { "detune", "DESACCORD" },
+                                                    { "spread", "STEREO" }, { "uniBlend", "BLEND" } } },
+        { "BRUIT/CORDE", 5, VizNoise, VizString,  { { "noiseLevel", "BRUIT" }, { "noiseTone", "TON" },
+                                                    { "noiseDecay", "DECAY" }, { nullptr, nullptr },
+                                                    { "strLevel", "CORDE" }, { "strDecay", "DUREE" },
+                                                    { "strPos", "PINCEMENT" }, { "strBright", "BRILLANCE" } } },
+        { "PITCH/JEU", 0, VizPitch, VizGlide,     { { "pitchEnvAmt", "PITCH ENV" }, { "pitchEnvDecay", "DECAY" },
+                                                    { "oscPhase", "PHASE" }, { "strTune", "ACCORD CORDE" },
+                                                    { "glide", "GLIDE" }, { "bendRange", "BEND" },
+                                                    { "strDamp", "AMORTI CORDE" } } },
+        { "ENV FILTRE", 4, VizEnvFilter, VizFilter, { { "fltAttack", "ATTACK" }, { "fltDecay", "DECAY" },
+                                                    { "fltSustain", "SUSTAIN" }, { "fltRelease", "RELEASE" },
+                                                    { "fltEnvAmount", "ENV > CUTOFF" }, { "velFilter", "VEL > FILTRE" },
+                                                    { "cutoff", "CUTOFF" }, { "resonance", "RESO" } } }
     };
     return defs[juce::jlimit (0, numMenus - 1, index)];
+}
+
+const MonSyntheEditor::FamilyDef& MonSyntheEditor::familyAt (int index)
+{
+    static const FamilyDef defs[10] =
+    {
+        { "OSC",     0, 5, { mOscA, mOscB, mFmRingUni, mNoiseStr, mPitchJeu } },
+        { "FILTRE",  4, 3, { mFilter, mFilter2, mDisto } },
+        { "ENV",     5, 3, { mEnvAmp, mEnvMod, mEnvFlt } },
+        { "LFO",     1, 2, { mLfo, mLfo34 } },
+        { "FX",      3, 4, { mChorus, mPhaser, mDelay, mReverb } },
+        { "MASTER",  0, 2, { mEq, mMaster } },
+        { "DESSIN",  3, 1, { mDraw } },
+        { "RACK",    2, 1, { mRack } },
+        { "MATRICE", 4, 1, { mMatrix } },
+        { "PRESETS", 1, 0, {} }
+    };
+    return defs[juce::jlimit (0, 9, index)];
+}
+
+void MonSyntheEditor::selectFamily (int family)
+{
+    family = juce::jlimit (0, 9, family);
+    if (family == 9)                                    // PRESETS : ouvre / ferme le navigateur
+    {
+        browserButton.triggerClick();
+        updateNavButtons();
+        return;
+    }
+    const auto& fam = familyAt (family);
+    const int t = juce::jlimit (0, fam.numTabs - 1, lastTab[(size_t) family]);
+    selectMenu (fam.tabs[t]);
+}
+
+void MonSyntheEditor::selectTab (int tab)
+{
+    const auto& fam = familyAt (currentFamily);
+    if (tab >= 0 && tab < fam.numTabs)
+        selectMenu (fam.tabs[tab]);
+}
+
+void MonSyntheEditor::updateNavButtons()
+{
+    const auto& fam = familyAt (currentFamily);
+    for (int f = 0; f < 10; ++f)
+        famButtons[(size_t) f].setToggleState (f == currentFamily || (f == 9 && browser != nullptr && browser->isVisible()),
+                                               juce::dontSendNotification);
+
+    for (int t = 0; t < 8; ++t)
+    {
+        auto& b = tabButtons[(size_t) t];
+        const bool show = fam.numTabs > 1 && t < fam.numTabs;
+        b.setVisible (show);
+        if (show)
+        {
+            const auto& page = menuAt (fam.tabs[t]);
+            b.setButtonText (page.name);
+            b.setColour (juce::TextButton::buttonOnColourId, Pal::role (fam.role));
+            b.setToggleState (t == currentTab, juce::dontSendNotification);
+        }
+    }
+}
+
+void MonSyntheEditor::pushPageToProcessor()
+{
+    for (size_t i = 0; i < fixedKnobs.size(); ++i)
+    {
+        juce::RangedAudioParameter* p = nullptr;
+        if (fixedKnobs[i] != nullptr && fixedKnobs[i]->paramId.isNotEmpty())
+            p = dynamic_cast<juce::RangedAudioParameter*> (proc.apvts.getParameter (fixedKnobs[i]->paramId));
+        proc.setPageKnob ((int) i, p);
+    }
+}
+
+// Valeurs affichées : peu de décimales (pourcentage entier pour les réglages 0..1, nombre entier au-dessus de 10)
+void MonSyntheEditor::applyKnobText (Knob& k)
+{
+    auto& s = k.slider;
+    const double lo = s.getMinimum(), hi = s.getMaximum();
+    const bool percent = lo >= -1.0001 && hi <= 1.0001 && (hi - lo) > 0.5;
+
+    s.textFromValueFunction = [percent] (double v)
+    {
+        if (percent)
+            return juce::String (juce::roundToInt (v * 100.0)) + "%";
+        const double a = std::abs (v);
+        if (a >= 10000.0)  return juce::String (v / 1000.0, 1) + "k";
+        if (a >= 1000.0)   return juce::String (v / 1000.0, 2) + "k";
+        if (a >= 10.0)     return juce::String (juce::roundToInt (v));
+        if (a >= 1.0)      return juce::String (v, 1);
+        return juce::String (v, 2);
+    };
+    s.valueFromTextFunction = [percent, lo, hi] (const juce::String& t)
+    {
+        double v = t.getDoubleValue();
+        if (t.containsChar ('k') || t.containsChar ('K'))
+            v *= 1000.0;
+        if (percent)
+            v /= 100.0;
+        return juce::jlimit (lo, hi, v);
+    };
+    s.updateText();
 }
 
 float MonSyntheEditor::pv (const char* id) const
@@ -534,7 +652,10 @@ MonSyntheEditor::Knob* MonSyntheEditor::makeKnob (const juce::String& paramId, c
     dimLabels.push_back (&k->label);
 
     if (paramId.isNotEmpty())
+    {
         k->attachment = std::make_unique<APVTS::SliderAttachment> (proc.apvts, paramId, s);
+        applyKnobText (*k);
+    }
 
     addAndMakeVisible (s);
     addAndMakeVisible (k->label);
@@ -621,8 +742,45 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
         b.setColour (juce::TextButton::textColourOffId, Pal::dim);
         b.setColour (juce::TextButton::textColourOnId, Pal::text);
         b.onClick = [this, i] { selectMenu (i); };
+    }
+
+    // --- Familles (colonne de gauche) et onglets (au-dessus des écrans)
+    for (int f = 0; f < 10; ++f)
+    {
+        auto& b = famButtons[(size_t) f];
+        b.setButtonText (familyAt (f).name);
+        b.setClickingTogglesState (false);
+        b.setColour (juce::TextButton::buttonOnColourId, Pal::role (familyAt (f).role));
+        b.setColour (juce::TextButton::textColourOffId, Pal::dim);
+        b.setColour (juce::TextButton::textColourOnId, Pal::text);
+        b.onClick = [this, f] { selectFamily (f); };
         addAndMakeVisible (b);
     }
+    for (int t = 0; t < 8; ++t)
+    {
+        auto& b = tabButtons[(size_t) t];
+        b.setClickingTogglesState (false);
+        b.setColour (juce::TextButton::textColourOffId, Pal::dim);
+        b.setColour (juce::TextButton::textColourOnId, Pal::text);
+        b.onClick = [this, t] { selectTab (t); };
+        addChildComponent (b);
+    }
+    styleButton (maschineButton, 4);
+    addAndMakeVisible (maschineButton);
+    maschineButton.onClick = [this]
+    {
+        if (proc.familyLearnIndex() >= 0 && proc.familyLearnIndex() < 10)
+        {
+            proc.cancelFamilyLearn();
+            statusMessage = "ASSISTANT MASCHINE ANNULE";
+        }
+        else
+        {
+            proc.startFamilyLearn();
+            statusMessage = "MASCHINE : appuie sur le bouton de gauche 1/10  ->  " + juce::String (familyAt (0).name);
+        }
+        statusFrames = 600;
+    };
 
     // --- EQ 8 bandes
     for (int i = 0; i < 8; ++i)
@@ -890,8 +1048,7 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     applyTheme();
 
     setResizable (true, true);
-    getConstrainer()->setFixedAspectRatio ((double) baseWidth / (double) baseHeight);
-    setResizeLimits (640, 360, 2560, 1440);
+    setResizeLimits (640, 330, 3200, 1650);          // fenêtre libre : l'interface s'adapte à la hauteur et à la largeur
     startTimerHz (30);
     setSize (baseWidth, baseHeight);
 }
@@ -921,11 +1078,23 @@ void MonSyntheEditor::selectMenu (int index)
             k->label.setText (def.p[i].label, juce::dontSendNotification);
             k->attachment = std::make_unique<APVTS::SliderAttachment> (proc.apvts, def.p[i].id, k->slider);
             k->paramId = def.p[i].id;
+            applyKnobText (*k);
         }
     }
 
     for (int i = 0; i < numMenus; ++i)
         menuButtons[(size_t) i].setToggleState (i == currentMenu, juce::dontSendNotification);
+
+    for (int f = 0; f < 9; ++f)                          // famille et onglet de cette page
+        for (int t = 0; t < familyAt (f).numTabs; ++t)
+            if (familyAt (f).tabs[t] == currentMenu)
+            {
+                currentFamily = f;
+                currentTab = t;
+                lastTab[(size_t) f] = t;
+            }
+    updateNavButtons();
+    pushPageToProcessor();
 
     if (currentMenu == mEq)
         selectEqBand (eqBand);
@@ -974,8 +1143,8 @@ void MonSyntheEditor::updateMenuVisibility()
     lfo3Sync.box.setVisible (currentMenu == mLfo34);
     lfo4Shape.box.setVisible (currentMenu == mLfo34);
     lfo4Sync.box.setVisible (currentMenu == mLfo34);
-    monoButton.setVisible (currentMenu == mJeu);
-    noiseType.box.setVisible (currentMenu == mNoise);
+    monoButton.setVisible (currentMenu == mJeu || currentMenu == mPitchJeu);
+    noiseType.box.setVisible (currentMenu == mNoise || currentMenu == mNoiseStr);
     for (auto& b : eqBandButtons)
         b.setVisible (currentMenu == mEq);
     for (auto& r : rack)
@@ -990,7 +1159,7 @@ void MonSyntheEditor::updateMenuVisibility()
     }
     eqOnButton.setVisible (currentMenu == mEq);
     eqTypeBox.setVisible (currentMenu == mEq);
-    phaseMode.box.setVisible (currentMenu == mPitch);
+    phaseMode.box.setVisible (currentMenu == mPitch || currentMenu == mPitchJeu);
     distType.box.setVisible (currentMenu == mDisto);
     quality.box.setVisible (currentMenu == mMaster);
 
@@ -1061,6 +1230,7 @@ void MonSyntheEditor::updateLeds()
         return 0.5f + 0.5f * std::sin ((float) (t * hz * juce::MathConstants<double>::twoPi + phase));
     };
 
+    std::array<float, numMenus> pageLvl {};
     for (int i = 0; i < numMenus; ++i)
     {
         float lvl = 0.12f;
@@ -1099,6 +1269,10 @@ void MonSyntheEditor::updateLeds()
                 break;
             }
             case mJeu:    lvl = pv ("mono") > 0.5f ? 0.9f : 0.25f;                      break;
+            case mFmRingUni: lvl = (pv ("fmAmount") > 0.01f || pv ("ringAmount") > 0.01f || pv ("unison") > 1.5f) ? (active ? 0.35f + 0.65f * pulse (2.2, 0.3) : 0.6f) : 0.12f;  break;
+            case mNoiseStr:  lvl = (pv ("noiseLevel") > 0.01f || pv ("strLevel") > 0.01f) ? 0.3f + 0.7f * pulse (4.0, 0.0) : 0.12f;  break;
+            case mPitchJeu:  lvl = (std::abs (pv ("pitchEnvAmt")) > 0.5f || pv ("mono") > 0.5f) ? (active ? 1.0f : 0.6f) : 0.12f;  break;
+            case mEnvFlt:    lvl = active ? 0.35f + 0.65f * pulse (1.9, 0.7) : 0.12f;     break;
             case mPhaser: lvl = pv ("phaserMix") > 0.01f ? 0.45f + 0.55f * pulse (pv ("phaserRate"), 0.0) : 0.12f; break;
             case mChorus: lvl = pv ("chorusMix") > 0.01f ? 0.45f + 0.55f * pulse (pv ("chorusRate"), 0.0) : 0.12f; break;
             case mDelay:  lvl = pv ("delayMix") > 0.01f
@@ -1140,6 +1314,21 @@ void MonSyntheEditor::updateLeds()
             lvl = 1.0f;
 
         menuButtons[(size_t) i].setLed (lvl, Pal::role (menuAt (i).role));
+        pageLvl[(size_t) i] = lvl;
+    }
+
+    for (int f = 0; f < 10; ++f)
+    {
+        const auto& fam = familyAt (f);
+        float best = f == 9 ? (browser != nullptr && browser->isVisible() ? 1.0f : 0.12f) : 0.12f;
+        for (int t = 0; t < fam.numTabs; ++t)
+            best = juce::jmax (best, pageLvl[(size_t) fam.tabs[t]]);
+        famButtons[(size_t) f].setLed (best, Pal::role (fam.role));
+    }
+    {
+        const auto& fam = familyAt (currentFamily);
+        for (int t = 0; t < fam.numTabs && t < 8; ++t)
+            tabButtons[(size_t) t].setLed (pageLvl[(size_t) fam.tabs[t]], Pal::role (fam.role));
     }
 }
 
@@ -1176,10 +1365,12 @@ void MonSyntheEditor::resized()
     if (masterKnob == nullptr)
         return;
 
-    scale = (float) getWidth() / (float) baseWidth;
+    // fenêtre libre : l'interface tient toujours en entier (échelle = le plus petit des deux rapports), centrée en largeur
+    scale = juce::jmin ((float) getWidth() / (float) baseWidth, (float) getHeight() / (float) baseHeight);
     laf.setScale (scale);
+    originX = juce::jmax (0, (getWidth() - juce::roundToInt ((float) baseWidth * scale)) / 2);
 
-    auto R = [this] (int x, int y, int w, int h) { return juce::Rectangle<int> (S ((float) x), S ((float) y), S ((float) w), S ((float) h)); };
+    auto R = [this] (int x, int y, int w, int h) { return juce::Rectangle<int> (originX + S ((float) x), S ((float) y), S ((float) w), S ((float) h)); };
 
     // En-tête
     prevButton.setBounds (R (176, 12, 26, 28));
@@ -1190,22 +1381,25 @@ void MonSyntheEditor::resized()
     deleteButton.setBounds (R (590, 12, 56, 28));
     browserButton.setBounds (R (650, 12, 74, 28));
     mutateButton.setBounds (R (728, 12, 56, 28));
-    headerSpectrum.setBounds (R (792, 8, 210, 38));
+    headerSpectrum.setBounds (R (792, 8, 128, 38));
+    maschineButton.setBounds (R (928, 12, 78, 28));
     if (browser != nullptr)
-        browser->setBounds (R (184, 60, 828, 476));
+        browser->setBounds (R (184, 58, 828, 420));
     hueBar.setBounds (R (1020, 12, 240, 28));
 
     // Menus
-    menuPanel = R (8, 60, 168, 476);
-    for (int i = 0; i < numMenus; ++i)
-        menuButtons[(size_t) i].setBounds (R (14 + (i % 2) * 78, 88 + (i / 2) * 37, 74, 34));
+    menuPanel = R (8, 58, 168, 420);
+    for (int i = 0; i < 10; ++i)
+        famButtons[(size_t) i].setBounds (R (14 + (i % 2) * 78, 88 + (i / 2) * 77, 74, 70));
+    for (int t = 0; t < 8; ++t)
+        tabButtons[(size_t) t].setBounds (t < 4 ? R (184 + t * 103, 58, 100, 24) : R (602 + (t - 4) * 103, 58, 100, 24));
 
     // Écrans
-    screenAPanel = R (184, 60, 410, 476);
-    screenBPanel = R (602, 60, 410, 476);
-    gfxA   = R (194, 90, 390, 236);   gfxB   = R (612, 90, 390, 236);
-    stripA = R (194, 332, 390, 28);   stripB = R (612, 332, 390, 28);
-    knobsA = R (194, 366, 390, 162);  knobsB = R (612, 366, 390, 162);
+    screenAPanel = R (184, 86, 410, 392);
+    screenBPanel = R (602, 86, 410, 392);
+    gfxA   = R (194, 114, 390, 196);  gfxB   = R (612, 114, 390, 196);
+    stripA = R (194, 314, 390, 26);   stripB = R (612, 314, 390, 26);
+    knobsA = R (194, 344, 390, 128);  knobsB = R (612, 344, 390, 128);
     scopeArea = gfxA;
 
     for (int s = 0; s < 2; ++s)
@@ -1228,7 +1422,6 @@ void MonSyntheEditor::resized()
             f2Type.box.setBounds (first);       f2Mode.box.setBounds (second);
             lfoShape.box.setBounds (first);     lfoSync.box.setBounds (second);
             lfo3Shape.box.setBounds (first);    lfo3Sync.box.setBounds (second);
-            monoButton.setBounds (first);
             noiseType.box.setBounds (first);    phaseMode.box.setBounds (first);    distType.box.setBounds (first);
             quality.box.setBounds (first);
         }
@@ -1237,6 +1430,7 @@ void MonSyntheEditor::resized()
             lfo2Shape.box.setBounds (first);    lfo2Sync.box.setBounds (second);
             delaySync.box.setBounds (first);    delayMode.box.setBounds (second);
             lfo4Shape.box.setBounds (first);    lfo4Sync.box.setBounds (second);
+            monoButton.setBounds (first);
         }
     }
 
@@ -1251,34 +1445,34 @@ void MonSyntheEditor::resized()
     // EQ (graphique sur les deux écrans, bandes sous le graphique)
     eqGraphArea = gfxA.getUnion (gfxB);
     for (int i = 0; i < 8; ++i)
-        eqBandButtons[(size_t) i].setBounds (R (194 + i * 101, 332, 97, 28));
-    eqOnButton.setBounds (R (632, 384, 160, 34));
-    eqTypeBox.setBounds (R (632, 430, 160, 30));
+        eqBandButtons[(size_t) i].setBounds (R (194 + i * 101, 314, 97, 26));
+    eqOnButton.setBounds (R (632, 352, 160, 30));
+    eqTypeBox.setBounds (R (632, 390, 160, 28));
 
     // LFO dessiné : zone de dessin sur les deux écrans, boutons de formes dans la bande du bas
     drawView.setBounds (gfxA.getUnion (gfxB));
     for (int i = 0; i < 5; ++i)
-        drawShapeButtons[(size_t) i].setBounds (R (352 + i * 110, 332, 104, 28));
+        drawShapeButtons[(size_t) i].setBounds (R (352 + i * 110, 314, 104, 26));
 
     // Rack : 4 colonnes sur les deux écrans
     for (int s = 0; s < 4; ++s)
     {
         auto& r = rack[(size_t) s];
         const int x = 194 + s * 204, w = 196;
-        r.area = R (x, 92, w, 436);
-        r.onBtn.setBounds (R (x + 6, 114, 84, 26));
-        r.leftBtn.setBounds (R (x + 96, 114, 44, 26));
-        r.rightBtn.setBounds (R (x + 146, 114, 44, 26));
-        r.typeBox.setBounds (R (x + 6, 146, w - 12, 28));
-        placeKnob (r.k[0], R (x + 4, 182, 94, 98));
-        placeKnob (r.k[1], R (x + 98, 182, 94, 98));
-        placeKnob (r.k[2], R (x + 4, 284, 94, 98));
-        placeKnob (r.k[3], R (x + 98, 284, 94, 98));
-        placeKnob (r.k[4], R (x + 6, 392, w - 12, 28));
+        r.area = R (x, 88, w, 388);
+        r.onBtn.setBounds (R (x + 6, 108, 84, 24));
+        r.leftBtn.setBounds (R (x + 96, 108, 44, 24));
+        r.rightBtn.setBounds (R (x + 146, 108, 44, 24));
+        r.typeBox.setBounds (R (x + 6, 138, w - 12, 26));
+        placeKnob (r.k[0], R (x + 4, 172, 94, 84));
+        placeKnob (r.k[1], R (x + 98, 172, 94, 84));
+        placeKnob (r.k[2], R (x + 4, 260, 94, 84));
+        placeKnob (r.k[3], R (x + 98, 260, 94, 84));
+        placeKnob (r.k[4], R (x + 6, 352, w - 12, 26));
     }
 
     // Matrice (occupe les deux écrans)
-    matrixArea = R (194, 92, 808, 436);
+    matrixArea = R (194, 88, 808, 388);
     {
         const int x0 = matrixArea.getX();
         mixHdrSrc.setBounds (x0, matrixArea.getY(), S (220.0f), S (22.0f));
@@ -1288,48 +1482,84 @@ void MonSyntheEditor::resized()
 
         for (int i = 0; i < 12; ++i)
         {
-            const int y = matrixArea.getY() + S (26.0f) + i * S (34.0f) + S (2.0f);
-            mixSrcBox[(size_t) i].setBounds (x0, y, S (220.0f), S (28.0f));
-            mixDstBox[(size_t) i].setBounds (x0 + S (256.0f), y, S (220.0f), S (28.0f));
-            placeKnob (mixAmt[(size_t) i], juce::Rectangle<int> (x0 + S (496.0f), y, S (190.0f), S (28.0f)));
-            mixCrvBox[(size_t) i].setBounds (x0 + S (696.0f), y, S (112.0f), S (28.0f));
+            const int y = matrixArea.getY() + S (26.0f) + i * S (29.0f) + S (2.0f);
+            mixSrcBox[(size_t) i].setBounds (x0, y, S (220.0f), S (25.0f));
+            mixDstBox[(size_t) i].setBounds (x0 + S (256.0f), y, S (220.0f), S (25.0f));
+            placeKnob (mixAmt[(size_t) i], juce::Rectangle<int> (x0 + S (496.0f), y, S (190.0f), S (25.0f)));
+            mixCrvBox[(size_t) i].setBounds (x0 + S (696.0f), y, S (112.0f), S (25.0f));
         }
     }
 
     // Colonne de droite
-    macrosPanel = R (1020, 60, 252, 250);
+    macrosPanel = R (1020, 58, 252, 222);
     for (int i = 0; i < 4; ++i)
         placeKnob (macroKnobs[(size_t) i],
-                   R (1028 + (i % 2) * 120, 90 + (i / 2) * 108, 118, 104).reduced (S (4.0f)));
+                   R (1028 + (i % 2) * 120, 88 + (i / 2) * 94, 118, 92).reduced (S (4.0f)));
 
-    outPanel = R (1020, 318, 252, 218);
-    placeKnob (masterKnob, R (1028, 346, 120, 182));
-    meterArea = R (1158, 352, 24, 168);
-    ledsArea  = R (1196, 352, 66, 120);
+    outPanel = R (1020, 288, 252, 190);
+    placeKnob (masterKnob, R (1028, 314, 120, 158));
+    meterArea = R (1158, 320, 24, 144);
+    ledsArea  = R (1196, 320, 66, 110);
 
     // Séquenceur
-    seqPanel = R (8, 544, 1264, 168);
-    seqButton.setBounds (R (18, 572, 150, 24));
-    barsBox.setBounds (R (18, 600, 150, 22));
-    rateBox.setBounds (R (18, 626, 150, 22));
-    placeKnob (gateKnob, R (18, 652, 150, 20));
-    placeKnob (tempoKnob, R (18, 676, 150, 20));
-    grid.setBounds (R (180, 572, 1080, 132));
-    pianoButton.setBounds (R (960, 547, 90, 20));
-    recButton.setBounds (R (1056, 547, 90, 20));
+    seqPanel = R (8, 486, 1264, 166);
+    seqButton.setBounds (R (18, 514, 150, 24));
+    barsBox.setBounds (R (18, 542, 150, 22));
+    rateBox.setBounds (R (18, 568, 150, 22));
+    placeKnob (gateKnob, R (18, 594, 150, 20));
+    placeKnob (tempoKnob, R (18, 618, 150, 20));
+    grid.setBounds (R (180, 514, 1080, 132));
+    pianoButton.setBounds (R (960, 489, 90, 20));
+    recButton.setBounds (R (1056, 489, 90, 20));
     if (keyboard != nullptr)
     {
-        const auto kb = R (180, 572, 1080, 132);
+        const auto kb = R (180, 514, 1080, 132);
         keyboard->setBounds (kb);
         keyboard->setKeyWidth ((float) kb.getWidth() / 22.0f);     // 22 touches blanches de C2 a C5
         keyboard->setLowestVisibleKey (36);
     }
-    beatLedArea = R (1160, 548, 96, 16);
+    beatLedArea = R (1160, 490, 96, 16);
 
     updateMenuVisibility();
 }
 
 //==============================================================================
+void MonSyntheEditor::handleMidiNavigation()
+{
+    if (const int f = proc.navFamily.exchange (-1); f >= 0)
+        selectFamily (f);
+    if (const int t = proc.navTab.exchange (-1); t >= 0)
+        selectTab (t);
+
+    switch (proc.navAction.exchange (0))
+    {
+        case 1: stepPreset (-1);  break;
+        case 2: stepPreset (1);   break;
+        case 3: proc.mutateSound (0.15f);  statusMessage = "MUTATION DOUCE";  statusFrames = 60;  break;
+        case 4: proc.mutateSound (0.5f);   statusMessage = "MUTATION FORTE";  statusFrames = 60;  break;
+        default: break;
+    }
+
+    // Assistant Maschine : un message par bouton de gauche appris
+    const int fl = proc.familyLearnIndex();
+    if (fl != lastFamilyLearn)
+    {
+        lastFamilyLearn = fl;
+        if (fl >= 10)
+        {
+            statusMessage = "MASCHINE : les 10 boutons de gauche sont assignes";
+            statusFrames = 200;
+            proc.cancelFamilyLearn();
+            lastFamilyLearn = -1;
+        }
+        else if (fl > 0)
+        {
+            statusMessage = "MASCHINE : bouton " + juce::String (fl) + "/10 appris. Suivant " + juce::String (fl + 1) + "/10  ->  " + juce::String (familyAt (fl).name);
+            statusFrames = 600;
+        }
+    }
+}
+
 void MonSyntheEditor::timerCallback()
 {
     grid.refresh();
@@ -1350,6 +1580,8 @@ void MonSyntheEditor::timerCallback()
         statusMessage = "CC " + juce::String (learned) + " -> " + proc.getLastLearnedParamName();
         statusFrames = 200;
     }
+
+    handleMidiNavigation();
 
     if (auto* moved = proc.takeMovedParam())
     {
@@ -1413,7 +1645,7 @@ void MonSyntheEditor::timerCallback()
     repaint (meterArea.expanded (S (4.0f)));
     repaint (ledsArea.expanded (S (4.0f)));
     repaint (seqPanel.withHeight (S (26.0f)));
-    repaint (juce::Rectangle<int> (S (10.0f), S (4.0f), S (160.0f), S (44.0f)));
+    repaint (juce::Rectangle<int> (originX + S (10.0f), S (4.0f), S (160.0f), S (44.0f)));
 }
 
 //==============================================================================
@@ -1629,10 +1861,10 @@ void MonSyntheEditor::paint (juce::Graphics& g)
     g.fillRect (0, 0, getWidth(), S (54.0f));
     g.setColour (Pal::cyan.withAlpha (0.5f));
     g.fillRect (0, S (54.0f), getWidth(), juce::jmax (1, S (1.5f)));
-    drawLogo (g, juce::Rectangle<int> (S (10.0f), S (4.0f), S (160.0f), S (44.0f)));
+    drawLogo (g, juce::Rectangle<int> (originX + S (10.0f), S (4.0f), S (160.0f), S (44.0f)));
 
     // Menus
-    drawPanel (g, menuPanel, "MENUS", Pal::cyan);
+    drawPanel (g, menuPanel, "FAMILLES", Pal::cyan);
 
     // Écrans
     if (currentMenu == matrixMenu)
@@ -1644,10 +1876,10 @@ void MonSyntheEditor::paint (juce::Graphics& g)
         g.setColour (Pal::dim);
         for (int i = 0; i < 12; ++i)
         {
-            const int y = matrixArea.getY() + S (26.0f) + i * S (34.0f) + S (2.0f);
-            g.drawText ("->", matrixArea.getX() + S (222.0f), y, S (32.0f), S (28.0f), juce::Justification::centred, false);
+            const int y = matrixArea.getY() + S (26.0f) + i * S (29.0f) + S (2.0f);
+            g.drawText ("->", matrixArea.getX() + S (222.0f), y, S (32.0f), S (25.0f), juce::Justification::centred, false);
             g.setColour (Pal::line);
-            g.drawHorizontalLine (matrixArea.getY() + S (26.0f) + (i + 1) * S (34.0f) - S (2.0f),
+            g.drawHorizontalLine (matrixArea.getY() + S (26.0f) + (i + 1) * S (29.0f) - S (2.0f),
                                   (float) matrixArea.getX(), (float) matrixArea.getRight());
             g.setColour (Pal::dim);
         }
@@ -3516,7 +3748,10 @@ bool MonSyntheEditor::keyPressed (const juce::KeyPress& key)
 
     if (key == juce::KeyPress::tabKey)
     {
-        selectMenu ((currentMenu + (shift ? numMenus - 1 : 1)) % numMenus);
+        if (shift)
+            selectFamily ((currentFamily + 1) % 9);                       // Maj + Tab : famille suivante (le navigateur de presets reste à la souris)
+        else
+            selectTab ((currentTab + 1) % juce::jmax (1, familyAt (currentFamily).numTabs));
         return true;
     }
 
