@@ -444,9 +444,9 @@ private:
     void applyKeyboardColours();
 
     // Matrice de modulation (6 routes)
-    std::array<juce::ComboBox, 12> mixSrcBox, mixDstBox;
-    std::array<std::unique_ptr<APVTS::ComboBoxAttachment>, 12> mixSrcAtt, mixDstAtt;
-    juce::Label mixHdrSrc, mixHdrDst, mixHdrAmt;
+    std::array<juce::ComboBox, 12> mixSrcBox, mixDstBox, mixCrvBox;
+    std::array<std::unique_ptr<APVTS::ComboBoxAttachment>, 12> mixSrcAtt, mixDstAtt, mixCrvAtt;
+    juce::Label mixHdrSrc, mixHdrDst, mixHdrAmt, mixHdrCrv;
     std::vector<juce::Component*> matrixComponents;
 
     // En-tête

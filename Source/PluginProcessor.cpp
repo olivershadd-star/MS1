@@ -485,9 +485,10 @@ SynthVoice::SynthVoice (juce::AudioProcessorValueTreeState& state, const Wavetab
     for (int s = 0; s < numMixSlots; ++s)
     {
         const juce::String n = "mx" + juce::String (s + 1);
-        mixParams[(size_t) (s * 3)]     = apvts.getRawParameterValue (n + "Src");
-        mixParams[(size_t) (s * 3 + 1)] = apvts.getRawParameterValue (n + "Dst");
-        mixParams[(size_t) (s * 3 + 2)] = apvts.getRawParameterValue (n + "Amt");
+        mixParams[(size_t) (s * 4)]     = apvts.getRawParameterValue (n + "Src");
+        mixParams[(size_t) (s * 4 + 1)] = apvts.getRawParameterValue (n + "Dst");
+        mixParams[(size_t) (s * 4 + 2)] = apvts.getRawParameterValue (n + "Amt");
+        mixParams[(size_t) (s * 4 + 3)] = apvts.getRawParameterValue (n + "Crv");
     }
     for (int i = 0; i < 32; ++i)
         drawParams[(size_t) i] = apvts.getRawParameterValue ("draw" + juce::String (i + 1));
@@ -774,7 +775,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     const float distMix    = param ("distMix");
 
     // --- Matrice de modulation : sources 0..15, cibles 0..20
-    struct Slot { int src; int dst; float amt; };
+    struct Slot { int src; int dst; float amt; int crv; };
     std::array<Slot, numMixSlots> slots {};
     int numSlots = 0;
     bool resonanceModulated = false;
@@ -783,9 +784,10 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
 
     for (int s = 0; s < numMixSlots; ++s)
     {
-        const Slot sl { (int) mixParams[(size_t) (s * 3)]->load(),
-                        (int) mixParams[(size_t) (s * 3 + 1)]->load(),
-                        mixParams[(size_t) (s * 3 + 2)]->load() };
+        const Slot sl { (int) mixParams[(size_t) (s * 4)]->load(),
+                        (int) mixParams[(size_t) (s * 4 + 1)]->load(),
+                        mixParams[(size_t) (s * 4 + 2)]->load(),
+                        (int) mixParams[(size_t) (s * 4 + 3)]->load() };
 
         if (sl.src > 0 && sl.dst > 0 && sl.amt != 0.0f)
         {
@@ -971,7 +973,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         for (int s = 0; s < numSlots; ++s)
         {
             const auto& sl = slots[(size_t) s];
-            tgt[(size_t) sl.dst] += sl.amt * src[(size_t) sl.src];
+            tgt[(size_t) sl.dst] += sl.amt * shapeCurve (sl.crv, src[(size_t) sl.src]);
         }
 
         if ((i % pitchStep) == 0)
@@ -1393,11 +1395,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
 
     // Warp, FM et ring : de quoi travailler le son bien plus loin
     addChoice ("warpModeA", "Warp A Mode", warpModeNames(), 0);
-    addFloat  ("warpAmtA",  "Warp A", unit, 0.0f);
+    addFloat  ("warpAmtA",  "Warp A", NormalisableRange<float> (0.0f, 1.0f, 0.0f, 0.75f), 0.0f);
     addChoice ("warpModeB", "Warp B Mode", warpModeNames(), 0);
-    addFloat  ("warpAmtB",  "Warp B", unit, 0.0f);
-    addFloat  ("fmAmount",  "FM (B vers A)", unit, 0.0f);
-    addFloat  ("ringAmount", "Ring (A x B)", unit, 0.0f);
+    addFloat  ("warpAmtB",  "Warp B", NormalisableRange<float> (0.0f, 1.0f, 0.0f, 0.75f), 0.0f);
+    addFloat  ("fmAmount",  "FM (B vers A)", NormalisableRange<float> (0.0f, 1.0f, 0.0f, 0.6f), 0.0f);
+    addFloat  ("ringAmount", "Ring (A x B)", NormalisableRange<float> (0.0f, 1.0f, 0.0f, 0.65f), 0.0f);
 
     // Unison
     addInt   ("unison", "Unison", 1, 7, 3);
@@ -1423,7 +1425,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addFloat  ("f2Vowel",  "Filtre 2 Voyelle", NormalisableRange<float> (0.0f, 1.0f), 0.0f);
     addFloat  ("cutoff",    "Cutoff", NormalisableRange<float> (20.0f, 20000.0f, 0.0f, 0.3f), 2000.0f);
     addFloat  ("resonance", "Resonance", NormalisableRange<float> (0.5f, 10.0f, 0.0f, 0.5f), 0.7f);
-    addFloat  ("drive",     "Drive", unit, 0.0f);
+    addFloat  ("drive",     "Drive", NormalisableRange<float> (0.0f, 1.0f, 0.0f, 0.7f), 0.0f);
     addFloat  ("fltEnvAmount", "Filtre Env Quantite", NormalisableRange<float> (-1.0f, 1.0f), 0.0f);
     addFloat  ("fltAttack",  "Filtre Attack", time, 0.01f);
     addFloat  ("fltDecay",   "Filtre Decay", time, 0.4f);
@@ -1522,7 +1524,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addChoice ("phaseMode",  "Phase Mode", StringArray { "ALEATOIRE", "FIXE", "LIBRE" }, 0);
     addFloat  ("oscPhase",   "Phase Depart", unit, 0.0f);
     addChoice ("distType",   "Disto Type", StringArray { "SOFT", "HARD", "FOLD", "CRUSH", "ASYM" }, 0);
-    addFloat  ("distAmt",    "Disto Quantite", unit, 0.0f);
+    addFloat  ("distAmt",    "Disto Quantite", NormalisableRange<float> (0.0f, 1.0f, 0.0f, 0.7f), 0.0f);
     addFloat  ("distMix",    "Disto Mix", unit, 1.0f);
 
     // Matrice de modulation : 12 routes (source -> cible, quantité)
@@ -1535,6 +1537,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
                                                              modTargetNames(), 0));
         p.push_back (std::make_unique<AudioParameterFloat> (ParameterID { n + "Amt", 1 }, "Mod " + String (i) + " Quantite",
                                                             NormalisableRange<float> (-1.0f, 1.0f), 0.0f));
+        p.push_back (std::make_unique<AudioParameterChoice> (ParameterID { n + "Crv", 1 }, "Mod " + String (i) + " Courbe",
+                                                             StringArray { "LINEAIRE", "DOUX", "FIN DEBUT", "FIN MILIEU", "FIN FIN", "ETAGE 1", "ETAGE 2", "ETAGE 3" }, 0));
     }
 
     // Jeu
@@ -1587,6 +1591,8 @@ MonSyntheProcessor::MonSyntheProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "PARAMS", createLayout())
 {
+    ccExpect.fill (-1.0f);
+    ccLastRaw.fill (-1.0f);
     for (auto& v : scopeRing)
         v.store (0.0f);
 
@@ -1718,6 +1724,11 @@ void MonSyntheProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
         if (! m.isController() || m.getControllerNumber() >= 120)
             continue;
         const int cc = m.getControllerNumber();
+        if (cc == 64 && ! learnParam.load())
+        {
+            ccFineHeld = m.getControllerValue() >= 64;
+            continue;
+        }
         if (auto* lp = learnParam.exchange (nullptr))
         {
             for (auto& slot : ccParam)                                  // un réglage n'a qu'un seul CC
@@ -1729,7 +1740,33 @@ void MonSyntheProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
             triggerAsyncUpdate();
         }
         else if (auto* p = ccParam[(size_t) cc].load())
-            p->setValueNotifyingHost ((float) m.getControllerValue() / 127.0f);
+        {
+            const float raw = (float) m.getControllerValue() / 127.0f;
+            const float cur = p->getValue();
+            auto& expect = ccExpect[(size_t) cc];
+            auto& last = ccLastRaw[(size_t) cc];
+
+            if (ccFineHeld && last >= 0.0f)
+            {
+                // mode fin : le mouvement du potard est divisé par 10 (réglage au pourcent près, voire en dessous)
+                p->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, cur + (raw - last) * 0.1f));
+                expect = p->getValue();
+                lastMovedParam.store (p);
+            }
+            else
+            {
+                // mode reprise : si le réglage a changé ailleurs (preset, souris), le potard n'agit qu'après avoir rejoint la valeur
+                const bool known = expect >= 0.0f && std::abs (cur - expect) < 0.004f;
+                const bool crossed = last >= 0.0f && (last - cur) * (raw - cur) <= 0.0f;
+                if (known || std::abs (raw - cur) < 0.03f || crossed)
+                {
+                    p->setValueNotifyingHost (raw);
+                    expect = raw;
+                    lastMovedParam.store (p);
+                }
+            }
+            last = raw;
+        }
     }
 
     keyboardState.processNextMidiBuffer (midi, 0, numSamples, true);

@@ -680,6 +680,15 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
         addAndMakeVisible (src);
         addAndMakeVisible (dst);
 
+        auto& crv = mixCrvBox[(size_t) i];
+        fillChoices (proc.apvts, crv, (n + "Crv").toRawUTF8());
+        mixCrvAtt[(size_t) i] = std::make_unique<APVTS::ComboBoxAttachment> (proc.apvts, n + "Crv", crv);
+        crv.setColour (juce::ComboBox::arrowColourId, Pal::dim);
+        crv.setColour (juce::ComboBox::textColourId, Pal::text);
+        comboRefs.push_back ({ &crv, 4 });
+        addAndMakeVisible (crv);
+        matrixComponents.push_back (&crv);
+
         mixAmt[(size_t) i] = makeKnob (n + "Amt", "QTE", 2, true);
 
         matrixComponents.push_back (&src);
@@ -688,7 +697,7 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
         matrixComponents.push_back (&mixAmt[(size_t) i]->label);
     }
 
-    for (auto* l : { &mixHdrSrc, &mixHdrDst, &mixHdrAmt })
+    for (auto* l : { &mixHdrSrc, &mixHdrDst, &mixHdrAmt, &mixHdrCrv })
     {
         l->setColour (juce::Label::textColourId, Pal::dim);
         l->setInterceptsMouseClicks (false, false);
@@ -699,6 +708,8 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     mixHdrSrc.setText ("SOURCE", juce::dontSendNotification);
     mixHdrDst.setText ("CIBLE", juce::dontSendNotification);
     mixHdrAmt.setText ("QUANTITE", juce::dontSendNotification);
+    mixHdrCrv.setText ("COURBE", juce::dontSendNotification);
+    mixHdrCrv.setJustificationType (juce::Justification::centredLeft);
     mixHdrSrc.setJustificationType (juce::Justification::centredLeft);
     mixHdrDst.setJustificationType (juce::Justification::centredLeft);
     mixHdrAmt.setJustificationType (juce::Justification::centredLeft);
@@ -1272,14 +1283,16 @@ void MonSyntheEditor::resized()
         const int x0 = matrixArea.getX();
         mixHdrSrc.setBounds (x0, matrixArea.getY(), S (220.0f), S (22.0f));
         mixHdrDst.setBounds (x0 + S (256.0f), matrixArea.getY(), S (220.0f), S (22.0f));
-        mixHdrAmt.setBounds (x0 + S (496.0f), matrixArea.getY(), S (312.0f), S (22.0f));
+        mixHdrAmt.setBounds (x0 + S (496.0f), matrixArea.getY(), S (190.0f), S (22.0f));
+        mixHdrCrv.setBounds (x0 + S (696.0f), matrixArea.getY(), S (112.0f), S (22.0f));
 
         for (int i = 0; i < 12; ++i)
         {
             const int y = matrixArea.getY() + S (26.0f) + i * S (34.0f) + S (2.0f);
             mixSrcBox[(size_t) i].setBounds (x0, y, S (220.0f), S (28.0f));
             mixDstBox[(size_t) i].setBounds (x0 + S (256.0f), y, S (220.0f), S (28.0f));
-            placeKnob (mixAmt[(size_t) i], juce::Rectangle<int> (x0 + S (496.0f), y, S (312.0f), S (28.0f)));
+            placeKnob (mixAmt[(size_t) i], juce::Rectangle<int> (x0 + S (496.0f), y, S (190.0f), S (28.0f)));
+            mixCrvBox[(size_t) i].setBounds (x0 + S (696.0f), y, S (112.0f), S (28.0f));
         }
     }
 
@@ -1336,6 +1349,12 @@ void MonSyntheEditor::timerCallback()
     {
         statusMessage = "CC " + juce::String (learned) + " -> " + proc.getLastLearnedParamName();
         statusFrames = 200;
+    }
+
+    if (auto* moved = proc.takeMovedParam())
+    {
+        statusMessage = moved->getName (24) + " = " + moved->getText (moved->getValue(), 24) + juce::String (proc.isMidiFine() ? "   [FIN]" : "");
+        statusFrames = 60;
     }
 
     if (resampleSlot >= 0)
@@ -3459,19 +3478,17 @@ void MonSyntheEditor::nudgeKnob (Knob& k, int direction, bool fine, bool big)
     const double interval = s.getInterval();
     double v = s.getValue();
 
-    if (fine)
+    if (interval > 0.0 && range / interval < 200.0)
     {
-        // 0,25 % de la course du potard (dans l'échelle réelle du potard : précis même pour les Hz)
-        const double p = juce::jlimit (0.0, 1.0, s.valueToProportionOfLength (v) + direction * (big ? 0.025 : 0.0025));
-        v = s.proportionOfLengthToValue (p);
+        // réglage à valeurs discrètes (entier, choix) : une valeur par pression
+        v += direction * interval * (big ? 5.0 : 1.0);
     }
     else
     {
-        // une unité affichée : 1 si la plage est grande, sinon 0,1 ou 0,01
-        double step = range >= 20.0 ? 1.0 : (range >= 2.0 ? 0.1 : 0.01);
-        if (interval > 0.0)
-            step = juce::jmax (step, interval);
-        v += direction * step * (big ? 10.0 : 1.0);
+        // haut / bas : 1 % de la course du potard ; gauche / droite : 0,1 % ; Maj : x10 (dans l'échelle réelle du potard, Hz compris)
+        const double stepP = (fine ? 0.001 : 0.01) * (big ? 10.0 : 1.0);
+        const double p = juce::jlimit (0.0, 1.0, s.valueToProportionOfLength (v) + direction * stepP);
+        v = s.proportionOfLengthToValue (p);
     }
 
     s.setValue (juce::jlimit (lo, hi, v), juce::sendNotificationSync);

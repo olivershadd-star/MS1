@@ -76,6 +76,41 @@ inline int warpMipExtra (int mode, float amount) noexcept
     }
 }
 
+// Courbes de réponse d'une route de la matrice : 0 LIN, 1 DOUX (plafond 80 %), 2 FIN DEBUT, 3 FIN MILIEU, 4 FIN FIN, 5-7 ETAGE 1/2/3
+// ETAGE : 3 couches qui s'ouvrent à tour de rôle (1,2,3,1,2,3,1,2,3). La 1re moitié de la course n'ouvre que 30 % du total,
+// les 15 derniers % sont réservés (plafond 85 %). Chaque marche est lissée pour éviter les craquements.
+inline float shapeCurveUnit (int c, float x) noexcept
+{
+    x = juce::jlimit (0.0f, 1.0f, x);
+    switch (c)
+    {
+        case 1:  return 0.8f * std::pow (x, 1.4f);
+        case 2:  return x * x;
+        case 3:  { const float u = 2.0f * x - 1.0f; return 0.5f + 0.5f * (u < 0.0f ? -1.0f : 1.0f) * std::pow (std::abs (u), 1.8f); }
+        case 4:  return 1.0f - (1.0f - x) * (1.0f - x);
+        case 5: case 6: case 7:
+        {
+            const float total = x <= 0.5f ? 0.6f * x : 0.3f + (x - 0.5f) * 1.1f;      // 0..0.85
+            const float t = total * 9.0f;
+            const int layer = c - 5;
+            float sum = 0.0f;
+            for (int r = 0; r < 3; ++r)
+            {
+                const float u = juce::jlimit (0.0f, 1.0f, t - (float) (3 * r + layer));
+                sum += u * u * (3.0f - 2.0f * u);
+            }
+            return sum / 3.0f;
+        }
+        default: return x;
+    }
+}
+inline float shapeCurve (int c, float v) noexcept
+{
+    if (c <= 0)
+        return v;
+    return v < 0.0f ? -shapeCurveUnit (c, -v) : shapeCurveUnit (c, v);
+}
+
 // Distorsion : 0 SOFT, 1 HARD, 2 FOLD, 3 CRUSH, 4 ASYM. amt : 0..1
 inline float distShape (int type, float amt, float x) noexcept
 {
@@ -225,7 +260,7 @@ private:
     const WavetableBank& bank;
     std::atomic<float>& modWheel;
     std::atomic<double>& hostBpm;
-    std::array<std::atomic<float>*, numMixSlots * 3> mixParams {};   // source, cible, quantité de chaque route
+    std::array<std::atomic<float>*, numMixSlots * 4> mixParams {};   // source, cible, quantité de chaque route
 
     juce::ADSR adsr;      // volume
     juce::ADSR modEnv;    // position de la wavetable
@@ -530,6 +565,8 @@ public:
     bool isMidiLearning() const noexcept { return learnParam.load() != nullptr; }
     int getCcForParam (const juce::String& paramId) const;
     void forgetCcForParam (const juce::String& paramId);
+    juce::RangedAudioParameter* takeMovedParam() noexcept { return lastMovedParam.exchange (nullptr); }   // dernier réglage bougé au MIDI
+    bool isMidiFine() const noexcept { return ccFineHeld; }
     int takeLearnedCc() noexcept { return lastLearnedCc.exchange (-1); }       // numéro de CC qui vient d'être appris, ou -1
     juce::String getLastLearnedParamName() const { return lastLearnedName; }
 private:
@@ -540,6 +577,10 @@ private:
     std::array<std::atomic<juce::RangedAudioParameter*>, 128> ccParam {};
     std::atomic<juce::RangedAudioParameter*> learnParam { nullptr };
     std::atomic<int> lastLearnedCc { -1 };
+    std::array<float, 128> ccExpect {};        // dernière valeur posée par chaque CC (mode reprise) ; -1 = inconnue
+    std::array<float, 128> ccLastRaw {};       // dernière valeur brute reçue (mode fin)
+    bool ccFineHeld = false;                   // pédale CC 64 enfoncée : les potards MIDI deviennent 10x plus fins
+    std::atomic<juce::RangedAudioParameter*> lastMovedParam { nullptr };
     juce::String lastLearnedName;
     bool midiMapLoaded = false;
 
