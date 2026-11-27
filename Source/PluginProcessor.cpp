@@ -1013,7 +1013,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
 
             float sB = 0.0f;
             if (needB)
-                sB = bank.getSample (tabB, posBNow, mipB, warpPhase (warpModeB, warpB, phasesB[k]));
+                sB = bank.getSample (tabB, posBNow, juce::jmin (mipB + warpMipExtra (warpModeB, warpB), WavetableBank::numLevels - 1), warpPhase (warpModeB, warpB, phasesB[k]));
 
             double phaseA = phasesA[k];
             if (fm > 0.001f)
@@ -1022,7 +1022,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
                 phaseA -= std::floor (phaseA);
             }
 
-            const float sA = bank.getSample (tabA, posA, mipA, warpPhase (warpModeA, warpA, phaseA));
+            const float sA = bank.getSample (tabA, posA, juce::jmin (mipA + warpMipExtra (warpModeA, warpA), WavetableBank::numLevels - 1), warpPhase (warpModeA, warpA, phaseA));
 
             float s = levelA * sA + levelBNow * sB;
             if (ring > 0.001f)

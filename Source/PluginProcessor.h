@@ -15,17 +15,10 @@ inline double warpPhase (int mode, float amount, double p) noexcept
 
     switch (mode)
     {
-        case 1:                                  // BEND+ : on s'attarde au début du cycle
-        {
-            const double p2 = p * p;
-            return w < 0.5 ? p + (p2 - p) * (2.0 * w) : p2 + (p2 * p - p2) * (2.0 * w - 1.0);
-        }
+        case 1:                                  // BEND+ : on s'attarde au début du cycle (courbe puissance, jusqu'à p^5)
+            return std::pow (p, 1.0 + 4.0 * w);
         case 2:                                  // BEND- : on s'attarde à la fin du cycle
-        {
-            const double q = 1.0 - p, q2 = q * q;
-            const double r = w < 0.5 ? q + (q2 - q) * (2.0 * w) : q2 + (q2 * q - q2) * (2.0 * w - 1.0);
-            return 1.0 - r;
-        }
+            return 1.0 - std::pow (1.0 - p, 1.0 + 4.0 * w);
         case 3:                                  // SYNC : le cycle se répète plus vite
         {
             const double t = p * (1.0 + 7.0 * w);
@@ -64,6 +57,22 @@ inline double warpPhase (int mode, float amount, double p) noexcept
         }
         default:
             return p;
+    }
+}
+
+// Niveau de mip supplémentaire selon le warp : le warp étire le spectre, on retire donc des harmoniques à la source
+// pour que le contenu déformé ne dépasse pas Nyquist (réduit le repliement sans suréchantillonner davantage).
+inline int warpMipExtra (int mode, float amount) noexcept
+{
+    if (mode <= 0 || amount <= 0.05f)
+        return 0;
+    switch (mode)
+    {
+        case 3:  return amount > 0.86f ? 3 : (amount > 0.43f ? 2 : 1);     // SYNC : x(1+7w)
+        case 4:  return amount > 0.67f ? 2 : 1;                            // MIRROR : x(1+3w)
+        case 7:  case 6:  return amount > 0.3f ? 1 : 0;                    // QUANT, FLIP : marches et cassures
+        case 1:  case 2:  return amount > 0.5f ? 1 : 0;                    // BEND : pente raide
+        default: return 0;
     }
 }
 

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(MS1 VERSION 0.6.0)
+project(MS1 VERSION 0.7.0)
 
 # Numéro de build (fourni par GitHub Actions) affiché dans le plugin
 set(MS1_BUILD 0 CACHE STRING "Numéro de build")
