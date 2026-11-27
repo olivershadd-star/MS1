@@ -1425,7 +1425,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addFloat  ("f2Vowel",  "Filtre 2 Voyelle", NormalisableRange<float> (0.0f, 1.0f), 0.0f);
     addFloat  ("cutoff",    "Cutoff", NormalisableRange<float> (20.0f, 20000.0f, 0.0f, 0.3f), 2000.0f);
     addFloat  ("resonance", "Resonance", NormalisableRange<float> (0.5f, 10.0f, 0.0f, 0.5f), 0.7f);
-    addFloat  ("drive",     "Drive", NormalisableRange<float> (0.0f, 1.0f, 0.0f, 0.7f), 0.0f);
+    addFloat  ("drive",     "Drive", NormalisableRange<float> (0.0f, 1.0f, 0.0f, 1.5f), 0.0f);
     addFloat  ("fltEnvAmount", "Filtre Env Quantite", NormalisableRange<float> (-1.0f, 1.0f), 0.0f);
     addFloat  ("fltAttack",  "Filtre Attack", time, 0.01f);
     addFloat  ("fltDecay",   "Filtre Decay", time, 0.4f);
@@ -1524,7 +1524,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addChoice ("phaseMode",  "Phase Mode", StringArray { "ALEATOIRE", "FIXE", "LIBRE" }, 0);
     addFloat  ("oscPhase",   "Phase Depart", unit, 0.0f);
     addChoice ("distType",   "Disto Type", StringArray { "SOFT", "HARD", "FOLD", "CRUSH", "ASYM" }, 0);
-    addFloat  ("distAmt",    "Disto Quantite", NormalisableRange<float> (0.0f, 1.0f, 0.0f, 0.7f), 0.0f);
+    addFloat  ("distAmt",    "Disto Quantite", NormalisableRange<float> (0.0f, 1.0f), 0.0f);
     addFloat  ("distMix",    "Disto Mix", unit, 1.0f);
 
     // Matrice de modulation : 12 routes (source -> cible, quantité)
