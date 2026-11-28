@@ -44,16 +44,16 @@ Il est écrit en C++ avec JUCE par **ANKS Labs**, sans reprendre ni code ni inte
 ### Sources
 - **2 oscillateurs à table d'onde** (A et B) : **24 tables d'usine** (8 classiques calculées + 16 tables riches de jusqu'à 64 formes d'onde : choeur, FM, orgue, piano, cordes, vents, granulaire, disto, chip, basses, guitares…) + 2 emplacements **USER** (import WAV ou resample), 10 modes de warp.
 - **Sub**, **bruit**, et **corde** (Karplus-Strong).
-- **Résonateur modal** (12 modes) : corde, barre, marimba, cloche, tube, plaque, bol. Excité par une impulsion ou par le bruit en continu, avec position d'excitation, étirement (inharmonicité) et amortissement.
+- **Bruit** : blanc, rose, sale, **impulsions** (clics) et **grain** (bruit haché).
+- **Tables d'ondes à 20 niveaux de bande limitée** (demi-octave) et interpolation cubique : oscillateurs propres sur tout le clavier.
 - **Timbre qui évolue** (brillant à l'attaque, plus doux ensuite) et **suivi de clavier** du filtre et du volume.
-- Tables d'ondes à **20 niveaux de bande limitée** (demi-octave) et interpolation cubique : oscillateurs propres sur tout le clavier.
-- **FM** et **modulation en anneau** entre A et B.
-- **Unison** de 1 à 7 voix, **drive** avant filtre.
+- **FM** (B module A, ou **FM sinus** à ratio exact, indice et enveloppe dédiée), **AM** et **modulation en anneau** entre A et B.
+- **Unison** de 1 à 7 voix, 8 modes de répartition (linéaire, expo, super, octaves, quintes, mineur, majeur, cluster), **drive** avant filtre.
 - **Réglage Qualité** (page MASTER) : *Éco* (le plus léger), *Normal* (suréchantillonnage 2x, son plus propre en FM, warp et distorsion), *Haute* (4x sur les oscillateurs).
 - **Resample** : MS1 s'enregistre lui-même et réinjecte le résultat comme table d'onde.
 
 ### Filtres
-- **Filtre 1** : LP12, LP24, HP, BP, notch, peigne.
+- **Filtre 1** : LP12, LP24, HP, BP, notch, peigne, et six filtres **à caractère** qui réagissent au niveau du signal : **échelle**, **diode** (acide), **sale** LP/BP/HP, **cascade**.
 - **Filtre 2** : LP, HP, BP, notch, **formants** (voyelles). Les deux filtres se montent en série ou en parallèle.
 - **Distorsion par voix** après les filtres (5 types).
 
@@ -65,7 +65,7 @@ Il est écrit en C++ avec JUCE par **ANKS Labs**, sans reprendre ni code ni inte
 - **Matrice de modulation à 12 routes** : 16 sources (LFO, LFO dessiné, enveloppes, macros, vélocité, note, molette, aléa…) vers 22 cibles.
 
 ### Effets
-- Chaîne globale : **chorus / flanger → phaser → delay → reverb (réseau de retards à 8 lignes) → EQ 8 bandes**.
+- Chaîne globale : **chorus / flanger → phaser → delay → reverb (réseau de retards à 8 lignes) → EQ 8 bandes** (chorus et phaser refaits, delay en interpolation cubique).
 - **Rack FX à 4 emplacements** (ordre modifiable) avec 20 effets :
 
 | Famille | Effets |
@@ -80,7 +80,7 @@ Il est écrit en C++ avec JUCE par **ANKS Labs**, sans reprendre ni code ni inte
 
 ### Jeu
 - **Séquenceur pas à pas** (16 pas par mesure, jusqu'à 4 mesures).
-- **39 presets d'usine** en 6 familles (basses, nappes, leads, cordes, percussions, textures), niveaux calibrés et contrôlés par mesure.
+- **22 presets d'usine** (basses, nappes, leads, textures), niveaux calibrés et contrôlés par mesure.
 - **MIDI learn** sur n'importe quel potard.
 
 ## Raccourcis et ergonomie

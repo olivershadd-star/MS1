@@ -607,6 +607,22 @@ float SynthVoice::nextNoise (NoiseGen& n, int type, float tone)
         x = n.held;
     }
 
+    else if (type == 3)                  // impulsions : clics isolés, la densité suit le ton
+    {
+        const float p = 0.0004f + 0.03f * tone * tone;
+        return rng.nextFloat() < p ? (rng.nextFloat() < 0.5f ? 1.0f : -1.0f) * 2.5f : 0.0f;
+    }
+    else if (type == 4)                  // grain : bruit blanc coupé en morceaux de longueur aléatoire
+    {
+        if (n.hold <= 0)
+        {
+            n.held = rng.nextFloat() < 0.5f ? 1.0f : 0.0f;
+            n.hold = 40 + rng.nextInt (1800);
+        }
+        --n.hold;
+        x = w * n.held;
+    }
+
     const float k = 0.02f + 0.98f * tone * tone;        // ton : 1 = brillant, 0 = sombre
     n.lp += (x - n.lp) * k;
     return n.lp;
@@ -641,6 +657,7 @@ void SynthVoice::startNote (int midiNote, float vel, juce::SynthesiserSound*, in
             phasesB[i] = rng.nextDouble();
         }
         phaseSub = 0.0;
+        for (auto& pm : phasesM) pm = 0.0;
     }
     else if (phaseMode == 1)
     {
@@ -721,6 +738,7 @@ void SynthVoice::startNote (int midiNote, float vel, juce::SynthesiserSound*, in
     {
         filter.reset();
         filter2.reset();
+        nlf.reset();
     }
 
     adsr.noteOn();
@@ -794,6 +812,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     filter.setResonance (baseRes);
     const bool notch = (filterType == 4);        // NOTCH = passe-bas + passe-haut en parallele
     const bool comb  = (filterType == 5);        // COMB  = filtre en peigne accorde sur le cutoff
+    const bool nlType = filterType >= 6;         // filtres à caractère : échelle, diode, sales, cascade
     filter2.setType (notch ? FilterType::highpass : FilterType::lowpass);
     if (notch)
         filter2.setResonance (baseRes);
@@ -918,14 +937,18 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     const float spread = param ("spread");
     const float norm   = 1.0f / std::sqrt ((float) uni);
     const float uniBlend = param ("uniBlend");
+    const int   uniMode  = (int) param ("uniMode");
 
     std::array<float, maxUnison> offsets {};
     std::array<float, maxUnison> gainL {}, gainR {};
 
     for (int u = 0; u < uni; ++u)
     {
-        const float offset = uni > 1 ? -1.0f + 2.0f * (float) u / (float) (uni - 1) : 0.0f;
-        offsets[(size_t) u] = offset;
+        const float offset = uni > 1 ? -1.0f + 2.0f * (float) u / (float) (uni - 1) : 0.0f;       // position stéréo
+        float spreadOff = offset, semis = 0.0f;
+        ms::unisonPattern (uniMode, u, uni, spreadOff, semis);
+        offsets[(size_t) u] = spreadOff;
+        uniSemis[(size_t) u] = semis;
 
         const float angle = (offset * spread + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
         const float side = std::abs (offset) < 0.001f ? 1.0f : uniBlend;      // blend : niveau des voix laterales
@@ -984,6 +1007,10 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
     const float warpAmtB   = param ("warpAmtB");
     const float fmAmount   = param ("fmAmount");
     const float ringAmount = param ("ringAmount");
+    const bool  fmSine     = (int) param ("fmMode") == 1;
+    const float fmRatio    = param ("fmRatio");
+    const float fmEnvAmt   = param ("fmEnv");
+    const float amAmount   = param ("amAmount");
 
     // --- Hauteur : glide, pitch bend, modulation
     const double glideSec  = param ("glide");
@@ -1024,7 +1051,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         for (int u = 0; u < uni; ++u)
         {
             const auto k = (size_t) u;
-            const double ratio = std::pow (2.0, (double) (offsets[k] * detuneNow) / 1200.0);
+            const double ratio = std::pow (2.0, (double) (offsets[k] * detuneNow + uniSemis[k] * 100.0f) / 1200.0);
             incA[k] = freq / sr * ratio;
             incB[k] = freqB / sr * ratio;
         }
@@ -1036,7 +1063,9 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
             strGain = std::exp (-6.9078f / juce::jmax (0.05f, strDecaySec * (float) fs));    // -60 dB apres strDecaySec
         }
 
-        const double maxRatio = std::pow (2.0, (double) detuneNow / 1200.0);
+        float maxSemis = 0.0f;
+        for (int u = 0; u < uni; ++u) maxSemis = juce::jmax (maxSemis, uniSemis[(size_t) u]);
+        const double maxRatio = std::pow (2.0, (double) (detuneNow + maxSemis * 100.0f) / 1200.0);
         mipA = WavetableBank::levelForFrequency (freq * maxRatio);
         mipB = WavetableBank::levelForFrequency (freqB * maxRatio);
     };
@@ -1140,7 +1169,10 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         const float warpB = juce::jlimit (0.0f, 1.0f, warpAmtB + tgt[15]);
         const float fm    = juce::jlimit (0.0f, 1.0f, fmAmount + tgt[16]);
         const float ring  = juce::jlimit (0.0f, 1.0f, ringAmount + tgt[17]);
-        const bool  needB = levelBNow > 0.0f || fm > 0.001f || ring > 0.001f;
+        const float am    = juce::jlimit (0.0f, 1.0f, amAmount);
+        const bool  fmTab = fm > 0.001f && ! fmSine;
+        const bool  needB = levelBNow > 0.0f || fmTab || ring > 0.001f || am > 0.001f;
+        const float fmScale = fmEnvAmt >= 0.0f ? (1.0f - fmEnvAmt) + fmEnvAmt * mEnv : (1.0f + fmEnvAmt) - fmEnvAmt * (1.0f - mEnv);
 
         float l = 0.0f, r = 0.0f;
         auto oscStage = [&] (double step, float& oL, float& oR)
@@ -1157,7 +1189,13 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
                 sB = bank.getSample (tabB, posBNow, juce::jmin (lvB, WavetableBank::numLevels - 1), phB);
 
             double phaseA = phasesA[k];
-            if (fm > 0.001f)
+            if (fm > 0.001f && fmSine)
+            {
+                // vraie FM : modulateur sinusoïdal à ratio exact, indice porté par l'enveloppe de modulation
+                phaseA += (double) (fm * 1.5f * fmScale) * std::sin (ms::twoPi * phasesM[k]);
+                phaseA -= std::floor (phaseA);
+            }
+            else if (fm > 0.001f)
             {
                 // le modulateur est lu avec moins d'harmoniques : un front raide ferait sauter la phase de A (repliement)
                 const float sMod = bank.getSample (tabB, posBNow, juce::jmin (lvB + (fm > 0.6f ? 6 : (fm > 0.35f ? 4 : 2)), WavetableBank::numLevels - 1), phB);
@@ -1167,13 +1205,18 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
 
             const float sA = bank.getSample (tabA, posA, juce::jmin (mipA + warpMipExtra (warpModeA, warpA) + (fm > 0.85f ? 8 : (fm > 0.6f ? 6 : (fm > 0.35f ? 4 : (fm > 0.15f ? 2 : 0)))), WavetableBank::numLevels - 1), warpPhase (warpModeA, warpA, phaseA));
 
-            float s = levelA * sA + levelBNow * sB;
+            float s = levelA * sA * (1.0f - am + am * (0.5f + 0.5f * sB)) + levelBNow * sB;
             if (ring > 0.001f)
                 s += ring * (sA * sB * 1.4f - s);
 
             oL += s * gainL[k];
             oR += s * gainR[k];
 
+            if (fmSine)
+            {
+                phasesM[k] += incA[k] * (double) fmRatio * step;
+                phasesM[k] -= std::floor (phasesM[k]);
+            }
             phasesA[k] += incA[k] * step;
             if (phasesA[k] >= 1.0) phasesA[k] -= 1.0;
             phasesB[k] += incB[k] * step;
@@ -1183,7 +1226,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
 
         // Le suréchantillonnage ne sert que si FM, ring ou warp créent des harmoniques au-delà de la limite ;
         // sinon les tables (déjà limitées en bande) passent directement, avec le même retard de 16 échantillons.
-        const bool needOs = fm > 0.001f || ring > 0.001f || (warpModeA != 0 && warpA > 0.001f) || (warpModeB != 0 && warpB > 0.001f);
+        const bool needOs = fm > 0.001f || ring > 0.001f || am > 0.001f || (warpModeA != 0 && warpA > 0.001f) || (warpModeB != 0 && warpB > 0.001f);
         if (osOsc > 1 && needOs)
         {
             for (int j = 0; j < osOsc; ++j)
@@ -1303,6 +1346,8 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
         const float octaves = (fltAmount + tgt[10]) * fEnv * 5.0f + tgt[3] * 5.0f + velTerm + fltKey * keyOct;
         const float cutoff = juce::jlimit (20.0f, 20000.0f, baseCutoff * std::exp2 (octaves));
         filter.setCutoffFrequency (cutoff);
+        if (nlType && (i & 3) == 0)
+            nlf.set (filterType - 6, sr, cutoff, juce::jlimit (0.5f, 10.0f, baseRes + (resonanceModulated ? tgt[4] * 4.0f : 0.0f)), driveNow);
         if (twoPole || notch)
             filter2.setCutoffFrequency (cutoff);
         if (resonanceModulated)
@@ -1336,6 +1381,11 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& buffer, int startSam
                 *in[ch] = y * outGain;
             }
             combPos = (combPos + 1) & 4095;
+        }
+        else if (nlType)
+        {
+            l = nlf.process (0, l);
+            r = nlf.process (1, r);
         }
         else if (notch)
         {
@@ -1604,6 +1654,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addFloat  ("warpAmtB",  "Warp B", NormalisableRange<float> (0.0f, 1.0f, 0.0f, 0.75f), 0.0f);
     addFloat  ("fmAmount",  "FM (B vers A)", NormalisableRange<float> (0.0f, 1.0f, 0.0f, 0.6f), 0.0f);
     addFloat  ("ringAmount", "Ring (A x B)", NormalisableRange<float> (0.0f, 1.0f, 0.0f, 0.65f), 0.0f);
+    addChoice ("fmMode",   "FM Mode", StringArray { "TABLE", "SINUS" }, 0);
+    addFloat  ("fmRatio",  "FM Ratio", NormalisableRange<float> (0.25f, 16.0f, 0.0f, 0.5f), 1.0f);
+    addFloat  ("fmEnv",    "FM Env > Indice", NormalisableRange<float> (-1.0f, 1.0f), 0.0f);
+    addFloat  ("amAmount", "AM (A par B)", NormalisableRange<float> (0.0f, 1.0f, 0.0f, 0.65f), 0.0f);
+    addChoice ("uniMode",  "Unison Mode", StringArray { "LINEAIRE", "EXPO", "SUPER", "OCTAVES", "QUINTES", "MINEUR", "MAJEUR", "CLUSTER" }, 0);
 
     // Unison
     addInt   ("unison", "Unison", 1, 7, 3);
@@ -1611,7 +1666,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
     addFloat ("spread", "Stereo", unit, 0.6f);
 
     // Filtre
-    addChoice ("filterType", "Filtre Type", StringArray { "LP 12", "LP 24", "HP", "BP", "NOTCH", "COMB" }, 0);
+    addChoice ("filterType", "Filtre Type", StringArray { "LP 12", "LP 24", "HP", "BP", "NOTCH", "COMB", "ECHELLE", "DIODE", "SALE LP", "SALE BP", "SALE HP", "CASCADE" }, 0);
     // LFO dessiné
     addFloat  ("dwRate",   "Dessin Vitesse (Hz)", NormalisableRange<float> (0.05f, 20.0f, 0.0f, 0.4f), 1.0f);
     addChoice ("dwSync",   "Dessin Sync", lfoSyncNames(), 0);
@@ -1720,7 +1775,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MonSyntheProcessor::createLa
 
     // Bruit, hauteur (kicks), départ de phase, distorsion
     addFloat  ("noiseLevel", "Bruit Niveau", unit, 0.0f);
-    addChoice ("noiseType",  "Bruit Type", StringArray { "BLANC", "ROSE", "SALE" }, 0);
+    addChoice ("noiseType",  "Bruit Type", StringArray { "BLANC", "ROSE", "SALE", "IMPULSIONS", "GRAIN" }, 0);
     addFloat  ("noiseTone",  "Bruit Ton", unit, 1.0f);
     addFloat  ("noiseDecay", "Bruit Decay", NormalisableRange<float> (0.005f, 5.0f, 0.0f, 0.35f), 5.0f);
     addFloat  ("pitchEnvAmt",   "Pitch Env Quantite (demi-tons)", NormalisableRange<float> (-60.0f, 60.0f), 0.0f);
@@ -1840,9 +1895,7 @@ void MonSyntheProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
     // Effets
     juce::dsp::ProcessSpec spec { sampleRate, (juce::uint32) juce::jmax (samplesPerBlock, 8192), 2 };
-    chorus.prepare (spec);
-    chorus.setCentreDelay (7.0f);
-    chorus.setFeedback (0.0f);
+    chorus.prepare (sampleRate);
 
     delayLine.setMaximumDelayInSamples ((int) (sampleRate * 1.3) + 8);
     delayLine.prepare (spec);
@@ -1850,8 +1903,7 @@ void MonSyntheProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
     reverb.prepare (sampleRate);
 
-    phaser.prepare (spec);
-    phaser.setMix (0.5f);
+    phaser.prepare (sampleRate);
     preDelay.setMaximumDelayInSamples ((int) (sampleRate * 0.25) + 8);
     preDelay.prepare (spec);
     preDelay.reset();
@@ -2097,30 +2149,16 @@ void MonSyntheProcessor::applyEffects (juce::AudioBuffer<float>& buffer)
     const float chorusMix = param ("chorusMix");
     if (chorusMix > 0.001f && numCh == 2)
     {
-        chorus.setRate (param ("chorusRate"));
-        chorus.setDepth (param ("chorusDepth"));
-        chorus.setCentreDelay (param ("chorusDelay"));
-        chorus.setFeedback (param ("chorusFeedback"));
-        chorus.setMix (chorusMix);
-
-        juce::dsp::AudioBlock<float> block (buffer);
-        juce::dsp::ProcessContextReplacing<float> context (block);
-        chorus.process (context);
+        chorus.process (buffer.getWritePointer (0), buffer.getWritePointer (1), numSamples, param ("chorusRate"), param ("chorusDepth"),
+                        param ("chorusDelay"), param ("chorusFeedback"), chorusMix);
     }
 
     // Phaser
     const float phaserMix = param ("phaserMix");
     if (phaserMix > 0.001f && numCh == 2)
     {
-        phaser.setRate (param ("phaserRate"));
-        phaser.setDepth (param ("phaserDepth"));
-        phaser.setCentreFrequency (param ("phaserCentre"));
-        phaser.setFeedback (param ("phaserFeedback"));
-        phaser.setMix (phaserMix);
-
-        juce::dsp::AudioBlock<float> block (buffer);
-        juce::dsp::ProcessContextReplacing<float> context (block);
-        phaser.process (context);
+        phaser.process (buffer.getWritePointer (0), buffer.getWritePointer (1), numSamples, param ("phaserRate"), param ("phaserDepth"),
+                        param ("phaserCentre"), param ("phaserFeedback"), phaserMix);
     }
 
     // Delay : libre ou synchronise, stereo ou ping-pong, filtres dans le feedback

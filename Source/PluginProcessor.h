@@ -4,6 +4,7 @@
 #include <array>
 #include "FxRack.h"
 #include "Engine.h"
+#include "Character.h"
 
 // Déformation de la phase d'un oscillateur ("warp") :
 // 0 OFF, 1 BEND+, 2 BEND-, 3 SYNC, 4 MIRROR, 5 ASYM, 6 FLIP, 7 QUANT, 8 PWM, 9 WOBBLE
@@ -289,11 +290,13 @@ private:
     juce::ADSR modEnv;    // position de la wavetable
     juce::ADSR fltEnv;    // fréquence de coupure du filtre
     juce::dsp::StateVariableTPTFilter<float> filter, filter2;   // filter2 : 2e étage pour le LP 24 dB
+    ms::NlFilter nlf;                                           // filtres à caractère (échelle, diode, sales, cascade)
     juce::dsp::StateVariableTPTFilter<float> f2a, f2b, f2c;      // FILTRE 2 (f2b/f2c : NOTCH et FORMANTS)
     juce::SmoothedValue<float> position;
 
     double sr = 44100.0;
-    std::array<double, maxUnison> phasesA {}, phasesB {};
+    std::array<double, maxUnison> phasesA {}, phasesB {}, phasesM {};      // phasesM : modulateur sinus de la FM
+    std::array<float, maxUnison> uniSemis {};                              // intervalle d'accord de chaque voix d'unison (demi-tons)
     double phaseSub = 0.0;
     double lfoPhase = 0.0;
     double lfo2Phase = 0.0;
@@ -623,11 +626,11 @@ private:
     MonoCapableSynth synth;
 
     // Effets
-    juce::dsp::Chorus<float> chorus;
-    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine;
+    ms::ModChorus chorus;
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> delayLine;
     ms::FdnReverb reverb;
-    juce::dsp::Phaser<float> phaser;
-    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> preDelay { 48000 };
+    ms::Phaser6 phaser;
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> preDelay { 48000 };
     juce::AudioBuffer<float> reverbBuf;
     float dlLp[2] = { 0.0f, 0.0f }, dlHp[2] = { 0.0f, 0.0f };      // filtres du feedback de delay
     float rvLp[2] = { 0.0f, 0.0f }, rvHp[2] = { 0.0f, 0.0f };      // filtres de la reverb

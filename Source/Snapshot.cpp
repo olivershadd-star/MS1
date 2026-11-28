@@ -24,7 +24,7 @@ int main()
                            { "bruitcorde.png", find ("Pluie Acide"), 25 },
                            { "pitchjeu.png", find ("FM Boisee"), 26 },
                            { "filtre.png", find ("Reese Propre"), 7 },
-                           { "filtre2.png", find ("Souffle Nord"), 8 },
+                           { "filtre2.png", find ("Respiration"), 8 },
                            { "envflt.png", find ("Acide Rond"), 27 },
                            { "lfo.png", find ("Wobble Large"), 12 },
                            { "delay.png", find ("Echo Machine"), 18 },

@@ -536,12 +536,11 @@ const MonSyntheEditor::MenuDef& MonSyntheEditor::menuAt (int index)
                                                     { "fltSustain", "SUSTAIN" }, { "fltRelease", "RELEASE" },
                                                     { "fltEnvAmount", "ENV > CUTOFF" }, { "velFilter", "VEL > FILTRE" },
                                                     { "cutoff", "CUTOFF" }, { "resonance", "RESO" } } },
-        { "RESONATEUR", 3, VizModal, VizSpectrum, { { "rsLevel", "NIVEAU" }, { "rsDecay", "DUREE" },
-                                                    { "rsDamp", "AMORTI AIGUS" }, { "rsStretch", "INHARMONIQUE" },
-                                                    { "rsPos", "POINT DE FRAPPE" }, { "rsBurst", "DUREE DU CHOC" },
-                                                    { "rsBright", "DURETE DU CHOC" }, { "rsTune", "ACCORD" } } },
-        { "CORPS",     3, VizModal, VizSpectrum,  { { "rsFeed", "ENTREE OSC" }, { "rsDry", "SON DIRECT" },
-                                                    { "rsLevel", "NIVEAU" }, { "rsDamp", "AMORTI AIGUS" } } },
+        { "FM OP",     2, VizFmRing, VizScopeA,   { { "fmRatio", "RATIO" }, { "fmAmount", "INDICE" },
+                                                    { "fmEnv", "ENV > INDICE" }, { "amAmount", "AM (B)" },
+                                                    { "oscBLevel", "NIVEAU B" } } },
+        { "MODE UNI",  3, VizUnison, VizSpectrum, { { "unison", "VOIX" }, { "detune", "DESACCORD" },
+                                                    { "spread", "STEREO" }, { "uniBlend", "BLEND" } } },
         { "TIMBRE",    5, VizTimbre, VizEnvAmp,   { { "tbAmt", "QUANTITE" }, { "tbDecay", "DUREE" },
                                                     { "tbEnd", "BRILLANCE FINALE" }, { "tbVel", "VELOCITE" },
                                                     { "fltKey", "FILTRE/CLAVIER" }, { "ampKey", "NIVEAU/CLAVIER" },
@@ -554,7 +553,7 @@ const MonSyntheEditor::FamilyDef& MonSyntheEditor::familyAt (int index)
 {
     static const FamilyDef defs[10] =
     {
-        { "OSC",     0, 7, { mOscA, mOscB, mFmRingUni, mNoiseStr, mPitchJeu, mReso, mBody } },
+        { "OSC",     0, 7, { mOscA, mOscB, mFmRingUni, mNoiseStr, mPitchJeu, mFmOp, mUniMode } },
         { "FILTRE",  4, 3, { mFilter, mFilter2, mDisto } },
         { "ENV",     5, 4, { mEnvAmp, mEnvMod, mEnvFlt, mTimbre } },
         { "LFO",     1, 2, { mLfo, mLfo34 } },
@@ -753,7 +752,7 @@ MonSyntheEditor::MonSyntheEditor (MonSyntheProcessor& p)
     setupCombo (noiseType, "noiseType", 5);  setupCombo (phaseMode, "phaseMode", 0);
     setupCombo (distType, "distType", 4);
     setupCombo (quality, "quality", 5);
-    setupCombo (rsMat, "rsMat", 3);
+    setupCombo (fmMode, "fmMode", 2);       setupCombo (uniMode, "uniMode", 3);
 
     styleButton (monoButton, 2);
     monoButton.setButtonText ("MONO");
@@ -1161,7 +1160,8 @@ void MonSyntheEditor::updateMenuVisibility()
         b.setVisible (currentMenu == mDraw);
     f2Type.box.setVisible (currentMenu == mFilter2);
     f2Mode.box.setVisible (currentMenu == mFilter2);
-    rsMat.box.setVisible (currentMenu == mReso);
+    fmMode.box.setVisible (currentMenu == mFmOp);
+    uniMode.box.setVisible (currentMenu == mUniMode);
     lfoShape.box.setVisible (currentMenu == mLfo);
     lfoSync.box.setVisible (currentMenu == mLfo);
     lfo2Shape.box.setVisible (currentMenu == mLfo);
@@ -1302,7 +1302,8 @@ void MonSyntheEditor::updateLeds()
             case mNoiseStr:  lvl = (pv ("noiseLevel") > 0.01f || pv ("strLevel") > 0.01f) ? 0.3f + 0.7f * pulse (4.0, 0.0) : 0.12f;  break;
             case mPitchJeu:  lvl = (std::abs (pv ("pitchEnvAmt")) > 0.5f || pv ("mono") > 0.5f) ? (active ? 1.0f : 0.6f) : 0.12f;  break;
             case mEnvFlt:    lvl = active ? 0.35f + 0.65f * pulse (1.9, 0.7) : 0.12f;     break;
-            case mReso: case mBody: lvl = pv ("rsLevel") > 0.01f ? (active ? 0.4f + 0.6f * pulse (3.1, 0.2) : 0.6f) : 0.12f;  break;
+            case mFmOp:     lvl = (pv ("fmAmount") > 0.01f || pv ("amAmount") > 0.01f) ? (active ? 0.4f + 0.6f * pulse (3.1, 0.2) : 0.6f) : 0.12f;  break;
+            case mUniMode:  lvl = pv ("unison") > 1.5f ? 0.6f : 0.12f;  break;
             case mTimbre:    lvl = (pv ("tbAmt") > 0.01f || pv ("fltKey") > 0.01f || std::abs (pv ("ampKey")) > 0.05f) ? 0.7f : 0.12f;  break;
             case mPhaser: lvl = pv ("phaserMix") > 0.01f ? 0.45f + 0.55f * pulse (pv ("phaserRate"), 0.0) : 0.12f; break;
             case mChorus: lvl = pv ("chorusMix") > 0.01f ? 0.45f + 0.55f * pulse (pv ("chorusRate"), 0.0) : 0.12f; break;
@@ -1455,7 +1456,7 @@ void MonSyntheEditor::resized()
             lfo3Shape.box.setBounds (first);    lfo3Sync.box.setBounds (second);
             noiseType.box.setBounds (first);    phaseMode.box.setBounds (first);    distType.box.setBounds (first);
             quality.box.setBounds (first);
-            rsMat.box.setBounds (first);
+            fmMode.box.setBounds (first);       uniMode.box.setBounds (first);
         }
         else
         {
@@ -2225,7 +2226,7 @@ void MonSyntheEditor::drawFilterViz (juce::Graphics& g, juce::Rectangle<float> r
     const float fc = pv ("cutoff");
     const float q = juce::jmax (0.3f, pv ("resonance"));
     const int type = (int) pv ("filterType");
-    static const char* typeNames[] = { "LP 12", "LP 24", "HP", "BP", "NOTCH", "COMB" };
+    static const char* typeNames[] = { "LP 12", "LP 24", "HP", "BP", "NOTCH", "COMB", "ECHELLE", "DIODE", "SALE LP", "SALE BP", "SALE HP", "CASCADE" };
 
     const auto area = r.reduced (4.0f * scale, 18.0f * scale);
     auto fx = [&] (float hz) { return area.getX() + area.getWidth() * std::log (hz / 20.0f) / std::log (1000.0f); };
@@ -2245,6 +2246,10 @@ void MonSyntheEditor::drawFilterViz (juce::Graphics& g, juce::Rectangle<float> r
             case 2:  return x2 / d;
             case 4:  return std::abs (1.0f - x2) / d;
             case 5:  return 0.15f + 1.2f * std::abs (std::cos (juce::MathConstants<float>::pi * x)) * (0.4f + 0.12f * q);
+            case 6:  case 11: return 1.0f / (d * d);
+            case 7:  return 1.0f / (d * std::sqrt (d));
+            case 8:  return 1.0f / d;
+            case 10: return x2 / d;
             default: return (x / q) / d;
         }
     };
@@ -2273,7 +2278,7 @@ void MonSyntheEditor::drawFilterViz (juce::Graphics& g, juce::Rectangle<float> r
 
     g.setFont (Pal::mono (10.5f * scale, true));
     g.setColour (Pal::text);
-    g.drawText (juce::String (typeNames[juce::jlimit (0, 3, type)]) + "   CUTOFF " + fmtHz (fc) + " Hz   Q "
+    g.drawText (juce::String (typeNames[juce::jlimit (0, 11, type)]) + "   CUTOFF " + fmtHz (fc) + " Hz   Q "
                     + juce::String (q, 1),
                 r.removeFromTop (14.0f * scale), juce::Justification::centredLeft, false);
 }

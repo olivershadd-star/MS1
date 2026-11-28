@@ -343,7 +343,7 @@ private:
     static constexpr int numMenus = 31, matrixMenu = 23;
     enum MenuId { mOscA = 0, mOscB, mFmRing, mUnison, mNoise, mString, mPitch, mFilter, mFilter2, mDisto, mEnvAmp, mEnvMod,
                   mLfo, mLfo34, mDraw, mJeu, mChorus, mPhaser, mDelay, mReverb, mEq, mMaster, mRack, mMatrix,
-                  mFmRingUni, mNoiseStr, mPitchJeu, mEnvFlt, mReso, mBody, mTimbre };      // pages fusionnées (ajoutées à la fin)
+                  mFmRingUni, mNoiseStr, mPitchJeu, mEnvFlt, mFmOp, mUniMode, mTimbre };      // pages fusionnées (ajoutées à la fin)
 
     static const MenuDef& menuAt (int index);
     struct FamilyDef { const char* name; int role; int numTabs; int tabs[8]; };
@@ -427,7 +427,7 @@ private:
     std::array<Knob*, 12> mixAmt {};
 
     NamedCombo tableA, tableB, warpA, warpB, filterType, lfoShape, lfoSync, lfo2Shape, lfo2Sync, lfo3Shape, lfo3Sync, lfo4Shape, lfo4Sync, delaySync, delayMode,
-               noiseType, phaseMode, distType, f2Type, f2Mode, dwSync, quality, rsMat;
+               noiseType, phaseMode, distType, f2Type, f2Mode, dwSync, quality, fmMode, uniMode;
     juce::TextButton monoButton;
     std::unique_ptr<APVTS::ButtonAttachment> monoAttachment;
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> captions;

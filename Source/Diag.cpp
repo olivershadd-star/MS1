@@ -307,101 +307,110 @@ int main()
         std::printf ("\n");
     }
 
-    // ------------------------------------------------------------------ I. Signatures d'instruments (le moteur sait-il produire des sons naturels ?)
-    std::printf ("\n== I. SIGNATURES : le moteur sait-il produire des sons de famille instrumentale ? (mesures, note C3 = 130,8 Hz)\n");
-    auto bodyOnly = [&] (int mat, float decay, float damp, float pos, float burst, float bright, float stretch)
+    // ------------------------------------------------------------------ J. Caractere : les familles de modules donnent-elles des sons differents ?
+    std::printf ("\n== J. CARACTERE : meme source, autre module : le son est-il reellement different ?\n");
+    auto saw = [&] ()
     {
         initClean (proc);
-        setP (proc, "oscALevel", 0.0f); setP (proc, "sustain", 1.0f); setP (proc, "decay", 0.01f); setP (proc, "attack", 0.001f); setP (proc, "release", 1.0f);
-        setP (proc, "cutoff", 20000.0f); setP (proc, "unison", 1.0f); setP (proc, "voiceGain", 6.0f);
-        setP (proc, "rsLevel", 0.9f); setP (proc, "rsMat", (float) mat); setP (proc, "rsDecay", decay); setP (proc, "rsDamp", damp);
-        setP (proc, "rsPos", pos); setP (proc, "rsBurst", burst); setP (proc, "rsBright", bright); setP (proc, "rsStretch", stretch);
+        setP (proc, "tableA", 0.0f); setP (proc, "position", 0.8f); setP (proc, "unison", 1.0f);
+        setP (proc, "sustain", 1.0f); setP (proc, "decay", 0.01f); setP (proc, "attack", 0.001f); setP (proc, "release", 0.2f);
+        setP (proc, "voiceGain", 0.0f);
     };
     {
-        // PINCE : les aigus s'eteignent plus vite, un creux regulier selon le point de pincage
-        bodyOnly (0, 3.0f, 0.7f, 0.2f, 1.5f, 0.8f, 0.0f);
-        auto r = render (proc, { 48 }, 3.0, 0.3);
-        const double f0 = hz (48);
-        std::printf ("PINCE (corde, pincement a 1/5) : centre de gravite %.0f Hz a 0,05-0,2 s  ->  %.0f Hz a 1,0-1,5 s ; niveau %.1f dB -> %.1f dB\n",
-                     centroidHz (r.m, 0.05, 0.2), centroidHz (r.m, 1.0, 1.5), db (rmsRange (r.m, 0.05, 0.2)), db (rmsRange (r.m, 1.0, 1.5)));
-        std::printf ("   fondamentale : %.1f dB (t=0,1 s) -> %.1f dB (t=1,5 s) ; harmonique 6 : %.1f dB -> %.1f dB (decroit plus vite = bien)\n",
-                     bandLevelDb (r.m, f0, 0.05, 0.3), bandLevelDb (r.m, f0, 1.4, 1.9), bandLevelDb (r.m, 6.0 * f0, 0.05, 0.3), bandLevelDb (r.m, 6.0 * f0, 1.4, 1.9));
-        std::printf ("   peigne du pincement (pos 0,2 : harmoniques 5 et 10 doivent etre tres bas) : h4 %.1f, h5 %.1f, h6 %.1f dB ; h9 %.1f, h10 %.1f, h11 %.1f dB\n",
-                     bandLevelDb (r.m, 4 * f0, 0.05, 0.3), bandLevelDb (r.m, 5 * f0, 0.05, 0.3), bandLevelDb (r.m, 6 * f0, 0.05, 0.3),
-                     bandLevelDb (r.m, 9 * f0, 0.05, 0.3), bandLevelDb (r.m, 10 * f0, 0.05, 0.3), bandLevelDb (r.m, 11 * f0, 0.05, 0.3));
-    }
-    {
-        // CLAVIER (piano) : inharmonicite croissante : l'harmonique 10 est au-dessus de 10 f0
-        bodyOnly (0, 4.0f, 0.55f, 0.12f, 4.0f, 0.45f, 0.35f);
-        auto r = render (proc, { 48 }, 3.0, 0.3);
-        const double f0 = hz (48);
-        // cherche le pic proche de 10 f0
-        double bestF = 0, bestL = -999;
-        for (double f = 9.8 * f0; f < 10.6 * f0; f += f0 / 400.0)
+        static const char* fn[] = { "LP 12", "LP 24", "HP", "BP", "NOTCH", "COMB", "ECHELLE", "DIODE", "SALE LP", "SALE BP", "SALE HP", "CASCADE" };
+        std::vector<std::vector<float>> sp;
+        std::printf ("J1. FILTRES (C3, cutoff 1200 Hz, reso 3, drive 0) : niveau, centre de gravite, et reaction au niveau d'entree\n");
+        std::printf ("    (rapport des centres de gravite entre une entree forte et une entree 12 dB plus faible : 1.00 = filtre lineaire)\n");
+        for (int t = 0; t < 12; ++t)
         {
-            const double l = bandLevelDb (r.m, f, 0.1, 0.6);
-            if (l > bestL) { bestL = l; bestF = f; }
-        }
-        std::printf ("CLAVIER (corde raide, marteau mou) : le 10e partiel tombe a %.3f x f0 (piano reel : environ 10,0 a 10,2) ; centre de gravite %.0f -> %.0f Hz\n",
-                     bestF / f0, centroidHz (r.m, 0.05, 0.3), centroidHz (r.m, 1.5, 2.0));
-    }
-    {
-        // CLOCHE : partiels non harmoniques longs
-        bodyOnly (3, 6.0f, 0.2f, 0.3f, 1.0f, 0.9f, 0.0f);
-        auto r = render (proc, { 60 }, 3.0, 0.3);
-        const double f0 = hz (60);
-        std::printf ("CLOCHE : niveau (dB) aux rapports 0,5 / 1 / 1,19 / 1,5 / 2 / 2,51 / 3 / 4,17 de f0 :");
-        for (double q : { 0.5, 1.0, 1.183, 1.506, 2.0, 2.514, 3.011, 4.166 })
-            std::printf (" %.0f", bandLevelDb (r.m, q * f0, 0.1, 0.4));
-        std::printf (" ; a 2,5 s : %.0f dB (fondamentale)\n", bandLevelDb (r.m, f0, 2.0, 2.6));
-        const double k2 = bandLevelDb (r.m, 2.0 * f0, 0.1, 0.4), k3 = bandLevelDb (r.m, 3.0 * f0, 0.1, 0.4), kx = bandLevelDb (r.m, 2.514 * f0, 0.1, 0.4);
-        std::printf ("   harmonique pur 2f0 : %.0f dB, 3f0 : %.0f dB, partiel inharmonique 2,514 f0 : %.0f dB\n", k2, k3, kx);
-    }
-    {
-        // SOUFFLE / TUBE : bruit continu entre dans un tube (flute / clarinette) : harmoniques impairs dominants
-        bodyOnly (4, 0.3f, 0.2f, 0.45f, 1.0f, 0.5f, 0.0f);
-        setP (proc, "rsFeed", 1.0f); setP (proc, "rsDry", 0.0f); setP (proc, "noiseLevel", 0.8f); setP (proc, "noiseDecay", 5.0f); setP (proc, "noiseType", 0.0f); setP (proc, "noiseTone", 0.7f);
-        auto r = render (proc, { 55 }, 2.0, 0.3);
-        const double f0 = hz (55);
-        std::printf ("TUBE alimente par du bruit : niveau (dB) de h1..h6 :");
-        for (int k = 1; k <= 6; ++k) std::printf (" %.0f", bandLevelDb (r.m, k * f0, 0.5, 1.5));
-        std::printf (" (impairs plus forts que pairs = tube ferme)\n");
-    }
-    {
-        // TIMBRE EVOLUTIF sur un oscillateur : saw riche, les aigus tombent
-        initClean (proc);
-        setP (proc, "tableA", 0.0f); setP (proc, "position", 0.5f); setP (proc, "cutoff", 20000.0f); setP (proc, "unison", 1.0f);
-        setP (proc, "sustain", 1.0f); setP (proc, "decay", 0.01f);
-        setP (proc, "tbAmt", 1.0f); setP (proc, "tbDecay", 0.5f); setP (proc, "tbEnd", 2.0f); setP (proc, "tbVel", 0.0f);
-        auto r = render (proc, { 48 }, 3.0, 0.2);
-        std::printf ("TIMBRE EVOLUTIF (saw) : centre de gravite %.0f Hz a 0-0,1 s -> %.0f Hz a 0,4-0,6 s -> %.0f Hz a 2,0-2,5 s\n",
-                     centroidHz (r.m, 0.0, 0.12), centroidHz (r.m, 0.4, 0.6), centroidHz (r.m, 2.0, 2.5));
-    }
-    {
-        // SUIVI DU CLAVIER du filtre : le rapport centre de gravite / f0 doit rester constant
-        std::printf ("SUIVI CLAVIER (saw, coupure 800 Hz) : centroide / f0 aux notes 36, 48, 60, 72, 84 :");
-        for (float key : { 0.0f, 1.0f })
-        {
-            std::printf ("\n   suivi %.0f %% :", key * 100.0f);
-            for (int n : { 36, 48, 60, 72, 84 })
+            auto run = [&] (float inLevel)
             {
-                initClean (proc);
-                setP (proc, "tableA", 0.0f); setP (proc, "position", 0.5f); setP (proc, "cutoff", 800.0f); setP (proc, "filterType", 1.0f);
-                setP (proc, "unison", 1.0f); setP (proc, "sustain", 1.0f); setP (proc, "decay", 0.01f); setP (proc, "fltKey", key);
-                auto r = render (proc, { n }, 1.2, 0.1);
-                std::printf (" %.1f", centroidHz (r.m, 0.4, 1.1) / hz (n));
-            }
+                saw (); setP (proc, "filterType", (float) t); setP (proc, "cutoff", 1200.0f); setP (proc, "resonance", 3.0f);
+                setP (proc, "oscALevel", inLevel);
+                return render (proc, { 48 }, 1.6, 0.2).m;
+            };
+            const auto xs = run (1.0f), xw = run (0.25f);
+            const double cs = centroidHz (xs, 0.4, 1.4), cw = centroidHz (xw, 0.4, 1.4);
+            std::printf ("    %-9s niveau %6.1f dB   centre %6.0f Hz   rapport fort/faible %.2f\n", fn[t], db (rmsRange (xs, 0.4, 1.4)), cs, cs / juce::jmax (1.0, cw));
+            sp.push_back (bands (xs, 0.4, 1.4));
         }
-        std::printf ("\n");
+        float sum = 0; int cnt = 0; float best = 999; int ba = 0, bb = 0;
+        for (size_t a = 0; a < sp.size(); ++a)
+            for (size_t b = a + 1; b < sp.size(); ++b)
+            { const float d = bandDist (sp[a], sp[b], true); sum += d; ++cnt; if (d < best) { best = d; ba = (int) a; bb = (int) b; } }
+        std::printf ("    distance moyenne entre filtres : %.1f dB ; la plus proche : %s / %s (%.1f dB)\n", sum / (float) cnt, fn[ba], fn[bb], best);
+        float sumNew = 0; int cNew = 0;
+        for (size_t a = 6; a < sp.size(); ++a) for (size_t b = 0; b < 6; ++b) { sumNew += bandDist (sp[a], sp[b], true); ++cNew; }
+        std::printf ("    distance moyenne des filtres a caractere aux 6 classiques : %.1f dB\n", sumNew / (float) cNew);
     }
     {
-        // REVERBE : queue apres le relachement
-        initClean (proc);
-        setP (proc, "reverbMix", 0.5f); setP (proc, "reverbSize", 0.5f); setP (proc, "reverbDamp", 0.4f);
-        setP (proc, "attack", 0.001f); setP (proc, "decay", 0.1f); setP (proc, "sustain", 0.0f); setP (proc, "release", 0.05f);
-        auto r = render (proc, { 60 }, 0.3, 5.0);
-        std::printf ("REVERBE (taille 0,5) : niveau de la queue : %.1f dB a +0,3 s, %.1f dB a +1,3 s, %.1f dB a +3,3 s (apres la note)\n",
-                     db (rmsRange (r.m, 0.6, 0.8)), db (rmsRange (r.m, 1.6, 1.8)), db (rmsRange (r.m, 3.6, 3.8)));
+        static const char* un[] = { "LINEAIRE", "EXPO", "SUPER", "OCTAVES", "QUINTES", "MINEUR", "MAJEUR", "CLUSTER" };
+        std::printf ("J2. UNISON (5 voix, desaccord 25 cents, C3) : centre de gravite et distance au mode LINEAIRE\n");
+        std::vector<float> ref;
+        for (int m = 0; m < 8; ++m)
+        {
+            saw (); setP (proc, "unison", 5.0f); setP (proc, "detune", 25.0f); setP (proc, "uniMode", (float) m); setP (proc, "cutoff", 20000.0f);
+            auto r = render (proc, { 48 }, 1.6, 0.2);
+            const auto b = bands (r.m, 0.4, 1.4);
+            if (m == 0) ref = b;
+            std::printf ("    %-9s centre %6.0f Hz   distance au lineaire %5.1f dB\n", un[m], centroidHz (r.m, 0.4, 1.4), bandDist (ref, b, true));
+        }
+    }
+    {
+        std::printf ("J3. FM SINUS (porteuse sinus, C3) : ratio entier = harmonique (residu bas), ratio non entier = metallique (residu haut)\n");
+        const double f0 = hz (48);
+        for (float ratio : { 1.0f, 2.0f, 3.0f, 1.414f, 2.76f })
+            for (float idx : { 0.15f, 0.4f })
+            {
+                saw (); setP (proc, "tableA", 0.0f); setP (proc, "position", 0.0f); setP (proc, "oscBLevel", 0.0f); setP (proc, "cutoff", 20000.0f);
+                setP (proc, "fmMode", 1.0f); setP (proc, "fmRatio", ratio); setP (proc, "fmAmount", idx);
+                auto r = render (proc, { 48 }, 1.6, 0.2);
+                std::printf ("    ratio %.3f indice %.2f : centre %6.0f Hz   residu non harmonique %6.1f dB\n", ratio, idx, centroidHz (r.m, 0.4, 1.4), inharmonicDb (r.m, f0));
+            }
+        for (int n : { 72, 96 })
+        {
+            saw (); setP (proc, "tableA", 0.0f); setP (proc, "position", 0.0f); setP (proc, "oscBLevel", 0.0f); setP (proc, "cutoff", 20000.0f);
+            setP (proc, "fmMode", 1.0f); setP (proc, "fmRatio", 2.0f); setP (proc, "fmAmount", 0.5f);
+            auto r = render (proc, { n }, 1.6, 0.2);
+            std::printf ("    repliement FM sinus (ratio 2, indice 0.5) a la note %d : %.1f dB (objectif < -45)\n", n, inharmonicDb (r.m, hz (n)));
+        }
+        saw (); setP (proc, "tableA", 0.0f); setP (proc, "position", 0.0f); setP (proc, "oscBLevel", 0.0f); setP (proc, "cutoff", 20000.0f);
+        setP (proc, "fmMode", 1.0f); setP (proc, "fmRatio", 3.0f); setP (proc, "fmAmount", 0.5f); setP (proc, "fmEnv", 1.0f);
+        setP (proc, "modAttack", 0.001f); setP (proc, "modDecay", 0.25f); setP (proc, "modSustain", 0.0f);
+        auto r = render (proc, { 48 }, 1.6, 0.2);
+        std::printf ("    indice porte par l'enveloppe : centre %.0f Hz a 0,03-0,1 s -> %.0f Hz a 1,0-1,4 s (doit retomber vers le sinus)\n",
+                     centroidHz (r.m, 0.03, 0.1), centroidHz (r.m, 1.0, 1.4));
+    }
+    {
+        std::printf ("J4. STABILITE des filtres a caractere : 6 types x reso 0.5/5/10 x cutoff 40/1000/18000 Hz x drive 0/1 (valeur max, NaN)\n");
+        int bad = 0, total = 0; float worst = 0;
+        for (int t = 6; t < 12; ++t)
+            for (float q : { 0.5f, 5.0f, 10.0f })
+                for (float c : { 40.0f, 1000.0f, 18000.0f })
+                    for (float d : { 0.0f, 1.0f })
+                    {
+                        saw (); setP (proc, "filterType", (float) t); setP (proc, "resonance", q); setP (proc, "cutoff", c); setP (proc, "drive", d);
+                        auto r = render (proc, { 48 }, 0.5, 0.1);
+                        float mx = 0; bool nan = false;
+                        for (float v : r.m) { if (! std::isfinite (v)) nan = true; mx = juce::jmax (mx, std::abs (v)); }
+                        ++total; worst = juce::jmax (worst, mx);
+                        if (nan || mx > 3.0f) { ++bad; std::printf ("    PROBLEME type %d reso %.1f cutoff %.0f drive %.0f : max %.2f %s\n", t, q, c, d, mx, nan ? "NaN" : ""); }
+                    }
+        std::printf ("    %d reglages testes, %d problemes, crete maximale %.2f\n", total, bad, worst);
+    }
+    {
+        std::printf ("J5. EFFETS : chorus et phaser refaits (niveau de sortie et absence de valeurs aberrantes)\n");
+        for (int which = 0; which < 2; ++which)
+        {
+            saw (); setP (proc, "cutoff", 20000.0f);
+            auto dry = render (proc, { 48 }, 1.2, 0.2);
+            if (which == 0) { setP (proc, "chorusMix", 1.0f); setP (proc, "chorusDepth", 0.6f); }
+            else            { setP (proc, "phaserMix", 1.0f); setP (proc, "phaserDepth", 0.8f); setP (proc, "phaserFeedback", 0.6f); }
+            auto wet = render (proc, { 48 }, 1.2, 0.2);
+            float mx = 0; bool nan = false; for (float v : wet.m) { if (! std::isfinite (v)) nan = true; mx = juce::jmax (mx, std::abs (v)); }
+            std::printf ("    %s mix 100%% : niveau %.1f dB (sec %.1f dB), crete %.2f%s\n", which == 0 ? "chorus" : "phaser", db (rmsRange (wet.m, 0.3, 1.1)),
+                         db (rmsRange (dry.m, 0.3, 1.1)), mx, nan ? " NaN !" : "");
+        }
     }
 
     // ------------------------------------------------------------------ D. Sensibilite des potards

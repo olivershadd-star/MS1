@@ -65,17 +65,6 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "mx4Dst", 8.0f }, { "mx4Amt", 0.6f }, { "mx4Crv", 6.0f }, { "mx5Src", 11.0f }, { "mx5Dst", 4.0f },
             { "mx5Amt", 0.5f }, { "mx5Crv", 7.0f }, { "voiceGain", 3.9f } } },
 
-        { "Corde Basse", "BASSES", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 1.0f }, { "unison", 1.0f }, { "spread", 0.0f },
-            { "glide", 0.0f }, { "oscALevel", 0.0f }, { "subLevel", 0.3f }, { "rsLevel", 0.9f }, { "rsMat", 0.0f },
-            { "rsDecay", 1.6f }, { "rsDamp", 0.8f }, { "rsPos", 0.12f }, { "rsBurst", 1.6f }, { "rsBright", 0.55f },
-            { "rsStretch", 0.03f }, { "filterType", 0.0f }, { "cutoff", 1500.0f }, { "resonance", 0.8f },
-            { "fltKey", 0.5f }, { "attack", 0.001f }, { "decay", 1.8f }, { "sustain", 0.0f }, { "release", 0.4f },
-            { "velFilter", 0.3f }, { "noiseLevel", 0.05f }, { "noiseType", 1.0f }, { "noiseTone", 0.4f },
-            { "noiseDecay", 0.02f }, { "reverbMix", 0.1f }, { "reverbSize", 0.3f }, { "mx1Src", 9.0f },
-            { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx1Crv", 0.0f }, { "mx2Src", 11.0f }, { "mx2Dst", 18.0f },
-            { "mx2Amt", 0.35f }, { "mx2Crv", 1.0f }, { "voiceGain", 4.1f } } },
-
         { "Wobble Large", "BASSES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 1.0f }, { "glide", 0.03f }, { "tableA", 22.0f },
             { "position", 0.5f }, { "unison", 3.0f }, { "detune", 12.0f }, { "spread", 0.4f }, { "subLevel", 0.5f },
@@ -159,30 +148,6 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "mx3Amt", 0.5f }, { "mx3Crv", 0.0f }, { "mx4Src", 11.0f }, { "mx4Dst", 18.0f }, { "mx4Amt", 0.3f },
             { "mx4Crv", 1.0f }, { "mx5Src", 12.0f }, { "mx5Dst", 6.0f }, { "mx5Amt", 0.6f }, { "mx5Crv", 0.0f },
             { "voiceGain", -1.0f } } },
-
-        { "Verre Chante", "NAPPES", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
-            { "rsLevel", 0.9f }, { "rsMat", 6.0f }, { "rsDecay", 5.0f }, { "rsDamp", 0.15f }, { "rsPos", 0.2f },
-            { "rsBurst", 30.0f }, { "rsBright", 0.45f }, { "rsFeed", 1.0f }, { "rsDry", 0.0f },
-            { "noiseLevel", 0.45f }, { "noiseType", 1.0f }, { "noiseTone", 0.75f }, { "noiseDecay", 5.0f },
-            { "attack", 1.2f }, { "decay", 0.5f }, { "sustain", 1.0f }, { "release", 3.0f }, { "filterType", 0.0f },
-            { "cutoff", 9000.0f }, { "fltKey", 0.4f }, { "reverbMix", 0.5f }, { "reverbSize", 0.9f },
-            { "lfo3Rate", 0.09f }, { "lfo3Shape", 0.0f }, { "mx1Src", 14.0f }, { "mx1Dst", 21.0f }, { "mx1Amt", 0.0f },
-            { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.45f }, { "mx2Crv", 0.0f }, { "mx3Src", 10.0f },
-            { "mx3Dst", 19.0f }, { "mx3Amt", 0.4f }, { "mx3Crv", 0.0f }, { "mx4Src", 11.0f }, { "mx4Dst", 18.0f },
-            { "mx4Amt", 0.25f }, { "mx4Crv", 1.0f }, { "voiceGain", -2.1f } } },
-
-        { "Souffle Nord", "NAPPES", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
-            { "rsLevel", 0.9f }, { "rsMat", 4.0f }, { "rsDecay", 0.35f }, { "rsDamp", 0.3f }, { "rsPos", 0.45f },
-            { "rsBurst", 20.0f }, { "rsBright", 0.5f }, { "rsFeed", 1.0f }, { "rsDry", 0.5f }, { "noiseLevel", 1.0f },
-            { "noiseType", 0.0f }, { "noiseTone", 0.6f }, { "noiseDecay", 5.0f }, { "attack", 0.7f },
-            { "decay", 0.5f }, { "sustain", 1.0f }, { "release", 2.2f }, { "filterType", 0.0f }, { "cutoff", 7000.0f },
-            { "fltKey", 0.6f }, { "reverbMix", 0.5f }, { "reverbSize", 0.9f }, { "lfo3Rate", 0.08f },
-            { "lfo3Shape", 1.0f }, { "mx1Src", 14.0f }, { "mx1Dst", 19.0f }, { "mx1Amt", 0.15f }, { "mx2Src", 9.0f },
-            { "mx2Dst", 3.0f }, { "mx2Amt", 0.45f }, { "mx2Crv", 0.0f }, { "mx3Src", 10.0f }, { "mx3Dst", 19.0f },
-            { "mx3Amt", 0.3f }, { "mx3Crv", 0.0f }, { "mx4Src", 11.0f }, { "mx4Dst", 18.0f }, { "mx4Amt", 0.25f },
-            { "mx4Crv", 1.0f }, { "voiceGain", 9.1f } } },
 
         { "Nuit Planetaire", "NAPPES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 15.0f }, { "position", 0.4f },
@@ -268,118 +233,6 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "mx4Crv", 0.0f }, { "mx5Src", 11.0f }, { "mx5Dst", 18.0f }, { "mx5Amt", 0.5f }, { "mx5Crv", 1.0f },
             { "mx6Src", 12.0f }, { "mx6Dst", 6.0f }, { "mx6Amt", 0.5f }, { "mx6Crv", 0.0f }, { "voiceGain", 3.2f } } },
 
-        //======================================================================== CORDES
-        { "Guitare Nylon", "CORDES", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
-            { "spread", 0.0f }, { "rsLevel", 0.9f }, { "rsMat", 0.0f }, { "attack", 0.001f }, { "sustain", 0.0f },
-            { "filterType", 0.0f }, { "fltKey", 0.5f }, { "velFilter", 0.3f }, { "rsDecay", 2.4f },
-            { "rsDamp", 0.72f }, { "rsPos", 0.17f }, { "rsBurst", 2.5f }, { "rsBright", 0.5f }, { "rsStretch", 0.02f },
-            { "cutoff", 4200.0f }, { "decay", 2.6f }, { "release", 0.5f }, { "noiseLevel", 0.07f },
-            { "noiseType", 1.0f }, { "noiseTone", 0.4f }, { "noiseDecay", 0.015f }, { "reverbMix", 0.16f },
-            { "reverbSize", 0.4f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx1Crv", 0.0f },
-            { "mx2Src", 11.0f }, { "mx2Dst", 18.0f }, { "mx2Amt", 0.3f }, { "mx2Crv", 1.0f }, { "voiceGain", -1.2f } } },
-
-        { "Guitare Acier", "CORDES", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
-            { "spread", 0.0f }, { "rsLevel", 0.9f }, { "rsMat", 0.0f }, { "attack", 0.001f }, { "sustain", 0.0f },
-            { "filterType", 0.0f }, { "fltKey", 0.5f }, { "velFilter", 0.3f }, { "rsDecay", 2.0f }, { "rsDamp", 0.5f },
-            { "rsPos", 0.1f }, { "rsBurst", 1.0f }, { "rsBright", 0.85f }, { "rsStretch", 0.04f },
-            { "cutoff", 9000.0f }, { "decay", 2.2f }, { "release", 0.4f }, { "noiseLevel", 0.05f },
-            { "noiseType", 0.0f }, { "noiseTone", 0.7f }, { "noiseDecay", 0.01f }, { "drive", 0.1f },
-            { "distType", 0.0f }, { "distAmt", 0.1f }, { "chorusMix", 0.18f }, { "reverbMix", 0.18f },
-            { "reverbSize", 0.4f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx1Crv", 0.0f },
-            { "mx2Src", 11.0f }, { "mx2Dst", 18.0f }, { "mx2Amt", 0.4f }, { "mx2Crv", 1.0f }, { "voiceGain", 2.2f } } },
-
-        { "Harpe", "CORDES", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
-            { "spread", 0.0f }, { "rsLevel", 0.9f }, { "rsMat", 0.0f }, { "attack", 0.001f }, { "sustain", 0.0f },
-            { "filterType", 0.0f }, { "fltKey", 0.5f }, { "velFilter", 0.3f }, { "rsDecay", 3.4f }, { "rsDamp", 0.5f },
-            { "rsPos", 0.3f }, { "rsBurst", 1.2f }, { "rsBright", 0.7f }, { "rsStretch", 0.01f },
-            { "cutoff", 11000.0f }, { "decay", 3.6f }, { "release", 1.2f }, { "reverbMix", 0.35f },
-            { "reverbSize", 0.7f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx1Crv", 0.0f },
-            { "voiceGain", -1.2f } } },
-
-        { "Piano Sourd", "CORDES", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
-            { "spread", 0.0f }, { "rsLevel", 0.9f }, { "rsMat", 0.0f }, { "attack", 0.001f }, { "sustain", 0.0f },
-            { "filterType", 0.0f }, { "fltKey", 0.5f }, { "velFilter", 0.5f }, { "rsDecay", 5.0f }, { "rsDamp", 0.6f },
-            { "rsPos", 0.12f }, { "rsBurst", 6.0f }, { "rsBright", 0.35f }, { "rsStretch", 0.22f },
-            { "cutoff", 7000.0f }, { "decay", 5.0f }, { "release", 0.45f }, { "tbAmt", 0.55f }, { "tbDecay", 1.3f },
-            { "tbEnd", 2.8f }, { "tbVel", 0.6f }, { "ampKey", -1.0f }, { "reverbMix", 0.22f }, { "reverbSize", 0.55f },
-            { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx1Crv", 0.0f }, { "voiceGain", -1.6f } } },
-
-        { "Piano Electrique", "CORDES", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "tableA", 12.0f }, { "position", 0.4f }, { "unison", 2.0f },
-            { "detune", 4.0f }, { "spread", 0.5f }, { "filterType", 0.0f }, { "cutoff", 8000.0f }, { "fltKey", 0.5f },
-            { "attack", 0.002f }, { "decay", 2.2f }, { "sustain", 0.2f }, { "release", 0.35f }, { "tbAmt", 0.75f },
-            { "tbDecay", 0.7f }, { "tbEnd", 2.2f }, { "tbVel", 0.6f }, { "velFilter", 0.4f }, { "chorusMix", 0.35f },
-            { "chorusRate", 0.9f }, { "chorusDepth", 0.35f }, { "reverbMix", 0.2f }, { "reverbSize", 0.5f },
-            { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx1Crv", 0.0f }, { "mx2Src", 10.0f },
-            { "mx2Dst", 1.0f }, { "mx2Amt", 0.3f }, { "mx2Crv", 0.0f }, { "mx3Src", 11.0f }, { "mx3Dst", 18.0f },
-            { "mx3Amt", 0.3f }, { "mx3Crv", 1.0f }, { "mx4Src", 12.0f }, { "mx4Dst", 6.0f }, { "mx4Amt", 0.4f },
-            { "mx4Crv", 0.0f }, { "voiceGain", 1.7f } } },
-
-        { "Clavecin", "CORDES", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "mono", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
-            { "spread", 0.0f }, { "rsLevel", 0.9f }, { "rsMat", 0.0f }, { "attack", 0.001f }, { "sustain", 0.0f },
-            { "filterType", 0.0f }, { "fltKey", 0.5f }, { "velFilter", 0.3f }, { "rsDecay", 1.4f },
-            { "rsDamp", 0.35f }, { "rsPos", 0.4f }, { "rsBurst", 0.6f }, { "rsBright", 1.0f }, { "rsStretch", 0.05f },
-            { "cutoff", 12000.0f }, { "decay", 1.5f }, { "release", 0.12f }, { "reverbMix", 0.2f },
-            { "reverbSize", 0.45f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx1Crv", 0.0f },
-            { "voiceGain", 2.6f } } },
-
-        //======================================================================== PERCUS
-        { "Cloche Nuit", "PERCUS", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f }, { "spread", 0.0f },
-            { "rsLevel", 0.9f }, { "attack", 0.001f }, { "sustain", 0.0f }, { "filterType", 0.0f }, { "fltKey", 0.3f },
-            { "cutoff", 14000.0f }, { "velFilter", 0.2f }, { "rsMat", 3.0f }, { "rsDecay", 8.0f }, { "rsDamp", 0.25f },
-            { "rsPos", 0.3f }, { "rsBurst", 0.8f }, { "rsBright", 0.85f }, { "decay", 5.0f }, { "release", 3.0f },
-            { "reverbMix", 0.4f }, { "reverbSize", 0.75f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f },
-            { "mx1Crv", 0.0f }, { "voiceGain", 1.3f } } },
-
-        { "Marimba", "PERCUS", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f }, { "spread", 0.0f },
-            { "rsLevel", 0.9f }, { "attack", 0.001f }, { "sustain", 0.0f }, { "filterType", 0.0f }, { "fltKey", 0.3f },
-            { "cutoff", 14000.0f }, { "velFilter", 0.2f }, { "rsMat", 2.0f }, { "rsDecay", 1.1f }, { "rsDamp", 0.45f },
-            { "rsPos", 0.25f }, { "rsBurst", 1.5f }, { "rsBright", 0.6f }, { "decay", 1.2f }, { "release", 0.3f },
-            { "ampKey", -1.5f }, { "reverbMix", 0.15f }, { "reverbSize", 0.35f }, { "mx1Src", 9.0f },
-            { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx1Crv", 0.0f }, { "voiceGain", -2.5f } } },
-
-        { "Vibraphone", "PERCUS", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f }, { "spread", 0.0f },
-            { "rsLevel", 0.9f }, { "attack", 0.001f }, { "sustain", 0.0f }, { "filterType", 0.0f }, { "fltKey", 0.3f },
-            { "cutoff", 14000.0f }, { "velFilter", 0.2f }, { "rsMat", 1.0f }, { "rsDecay", 5.0f }, { "rsDamp", 0.2f },
-            { "rsPos", 0.3f }, { "rsBurst", 2.0f }, { "rsBright", 0.55f }, { "decay", 5.0f }, { "release", 1.2f },
-            { "lfoShape", 0.0f }, { "lfoRate", 5.2f }, { "chorusMix", 0.18f }, { "reverbMix", 0.3f },
-            { "reverbSize", 0.6f }, { "mx1Src", 1.0f }, { "mx1Dst", 9.0f }, { "mx1Amt", 0.22f }, { "mx2Src", 9.0f },
-            { "mx2Dst", 3.0f }, { "mx2Amt", 0.5f }, { "mx2Crv", 0.0f }, { "voiceGain", -1.7f } } },
-
-        { "Gong Plaque", "PERCUS", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f }, { "spread", 0.0f },
-            { "rsLevel", 0.9f }, { "attack", 0.001f }, { "sustain", 0.0f }, { "filterType", 0.0f }, { "fltKey", 0.3f },
-            { "cutoff", 14000.0f }, { "velFilter", 0.2f }, { "rsMat", 5.0f }, { "rsDecay", 7.0f }, { "rsDamp", 0.15f },
-            { "rsPos", 0.2f }, { "rsBurst", 14.0f }, { "rsBright", 0.4f }, { "decay", 5.0f }, { "release", 3.0f },
-            { "reverbMix", 0.45f }, { "reverbSize", 0.8f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f },
-            { "mx1Crv", 0.0f }, { "mx2Src", 11.0f }, { "mx2Dst", 18.0f }, { "mx2Amt", 0.3f }, { "mx2Crv", 1.0f },
-            { "voiceGain", -1.3f } } },
-
-        { "Bol Tibetain", "PERCUS", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f }, { "spread", 0.0f },
-            { "rsLevel", 0.9f }, { "attack", 0.001f }, { "sustain", 0.0f }, { "filterType", 0.0f }, { "fltKey", 0.3f },
-            { "cutoff", 14000.0f }, { "velFilter", 0.2f }, { "rsMat", 6.0f }, { "rsDecay", 9.0f }, { "rsDamp", 0.1f },
-            { "rsPos", 0.15f }, { "rsBurst", 25.0f }, { "rsBright", 0.3f }, { "decay", 5.0f }, { "release", 3.5f },
-            { "reverbMix", 0.45f }, { "reverbSize", 0.8f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f },
-            { "mx1Crv", 0.0f }, { "voiceGain", -3.6f } } },
-
-        { "Kalimba", "PERCUS", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f }, { "spread", 0.0f },
-            { "rsLevel", 0.9f }, { "attack", 0.001f }, { "sustain", 0.0f }, { "filterType", 0.0f }, { "fltKey", 0.3f },
-            { "cutoff", 14000.0f }, { "velFilter", 0.2f }, { "rsMat", 2.0f }, { "rsStretch", 0.3f },
-            { "rsDecay", 0.7f }, { "rsDamp", 0.5f }, { "rsPos", 0.2f }, { "rsBurst", 0.5f }, { "rsBright", 0.9f },
-            { "rsTune", 1200.0f }, { "decay", 0.8f }, { "release", 0.2f }, { "reverbMix", 0.2f },
-            { "reverbSize", 0.4f }, { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx1Crv", 0.0f },
-            { "voiceGain", 3.6f } } },
-
         //======================================================================== TEXTURES
         { "Pluie Acide", "TEXTURES", {
             { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.2f }, { "tableA", 15.0f },
@@ -422,29 +275,7 @@ const std::vector<FactoryPreset>& factoryPresets()
             { "lfo4Shape", 0.0f }, { "width", 1.4f }, { "mx1Src", 15.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f },
             { "mx2Src", 9.0f }, { "mx2Dst", 3.0f }, { "mx2Amt", 0.5f }, { "mx2Crv", 0.0f }, { "mx3Src", 10.0f },
             { "mx3Dst", 15.0f }, { "mx3Amt", 0.4f }, { "mx3Crv", 0.0f }, { "mx4Src", 11.0f }, { "mx4Dst", 18.0f },
-            { "mx4Amt", 0.2f }, { "mx4Crv", 1.0f }, { "voiceGain", 12.0f } } },
-
-        { "Cables Metal", "TEXTURES", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.5f }, { "tableA", 10.0f },
-            { "position", 0.3f }, { "tableB", 8.0f }, { "oscBPos", 0.1f }, { "oscBOct", 1.0f }, { "oscBLevel", 0.0f },
-            { "ringAmount", 0.5f }, { "unison", 1.0f }, { "rsLevel", 0.7f }, { "rsMat", 5.0f }, { "rsDecay", 2.5f },
-            { "rsDamp", 0.2f }, { "rsFeed", 0.6f }, { "rsDry", 0.5f }, { "rsBurst", 3.0f }, { "rsBright", 0.6f },
-            { "filterType", 0.0f }, { "cutoff", 6000.0f }, { "attack", 0.6f }, { "decay", 0.5f }, { "sustain", 1.0f },
-            { "release", 1.8f }, { "reverbMix", 0.35f }, { "reverbSize", 0.7f }, { "mx1Src", 9.0f },
-            { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx1Crv", 0.0f }, { "mx2Src", 10.0f }, { "mx2Dst", 17.0f },
-            { "mx2Amt", 0.3f }, { "mx2Crv", 0.0f }, { "mx3Src", 11.0f }, { "mx3Dst", 18.0f }, { "mx3Amt", 0.3f },
-            { "mx3Crv", 1.0f }, { "voiceGain", 2.1f } } },
-
-        { "Echo Machine", "TEXTURES", {
-            { "lfoDepth", 0.0f }, { "modAmount", 0.0f }, { "oscALevel", 0.0f }, { "unison", 1.0f },
-            { "rsLevel", 0.9f }, { "rsMat", 0.0f }, { "rsDecay", 1.8f }, { "rsDamp", 0.6f }, { "rsPos", 0.2f },
-            { "rsBurst", 1.5f }, { "rsBright", 0.7f }, { "rsStretch", 0.05f }, { "attack", 0.001f }, { "decay", 1.9f },
-            { "sustain", 0.0f }, { "release", 0.4f }, { "filterType", 1.0f }, { "cutoff", 2600.0f },
-            { "resonance", 1.2f }, { "fltEnvAmount", 0.3f }, { "fltDecay", 0.4f }, { "fltSustain", 0.0f },
-            { "fltKey", 0.5f }, { "delayMode", 1.0f }, { "delaySync", 2.0f }, { "delayMix", 0.4f },
-            { "delayFeedback", 0.55f }, { "delayLP", 4200.0f }, { "reverbMix", 0.25f }, { "reverbSize", 0.6f },
-            { "mx1Src", 9.0f }, { "mx1Dst", 3.0f }, { "mx1Amt", 0.5f }, { "mx1Crv", 0.0f }, { "mx2Src", 11.0f },
-            { "mx2Dst", 18.0f }, { "mx2Amt", 0.3f }, { "mx2Crv", 1.0f }, { "voiceGain", 0.0f } } }
+            { "mx4Amt", 0.2f }, { "mx4Crv", 1.0f }, { "voiceGain", 12.0f } } }
     };
 
     return presets;
